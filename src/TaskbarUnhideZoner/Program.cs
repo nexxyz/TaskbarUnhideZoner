@@ -26,6 +26,11 @@ internal static class Program
             return HarnessRunner.Run(args);
         }
 
+        if (args.Contains("--test-unhide-loop", StringComparer.OrdinalIgnoreCase))
+        {
+            return UnhideLoopRunner.Run(args);
+        }
+
         if (!TryAcquireSingleInstance())
         {
             RollingFileLogger.Info("Another instance is already running; exiting.");

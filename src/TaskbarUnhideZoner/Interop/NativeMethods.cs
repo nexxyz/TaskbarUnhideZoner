@@ -7,8 +7,15 @@ internal static class NativeMethods
     public const int WhMouseLl = 14;
     public const int WmMouseMove = 0x0200;
     public const int WmNcMouseMove = 0x00A0;
+    public const int HtClient = 1;
     public const uint SmtoAbortIfHung = 0x0002;
+    public const uint SmtoNormal = 0x0000;
     public const uint MonitorDefaultToNearest = 0x00000002;
+    public const uint AbmGetState = 0x00000004;
+    public const uint AbmActivate = 0x00000006;
+    public const uint AbmSetState = 0x0000000A;
+    public const uint AbsAutoHide = 0x0000001;
+    public const uint AbsAlwaysOnTop = 0x0000002;
     public const int GwlStyle = -16;
     public const int GwlExStyle = -20;
     public const long WsChild = 0x40000000L;
@@ -49,6 +56,17 @@ internal static class NativeMethods
         public uint DwFlags;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AppBarData
+    {
+        public uint CbSize;
+        public IntPtr HWnd;
+        public uint UCallbackMessage;
+        public uint UEdge;
+        public Rect Rc;
+        public IntPtr LParam;
+    }
+
     public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -72,6 +90,9 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string? lpszClass, string? lpszWindow);
+
     [DllImport("user32.dll")]
     public static extern IntPtr SendMessageTimeout(
         IntPtr hWnd,
@@ -89,6 +110,9 @@ internal static class NativeMethods
     public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
 
     [DllImport("user32.dll")]
+    public static extern bool ScreenToClient(IntPtr hWnd, ref Point lpPoint);
+
+    [DllImport("user32.dll")]
     public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -96,4 +120,7 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("shell32.dll")]
+    public static extern IntPtr SHAppBarMessage(uint dwMessage, ref AppBarData pData);
 }

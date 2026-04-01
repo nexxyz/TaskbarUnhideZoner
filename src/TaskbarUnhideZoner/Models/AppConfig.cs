@@ -8,6 +8,8 @@ internal sealed class AppConfig
 
     public int TriggerDelayMs { get; set; } = 350;
 
+    public int AutohideStatePollSeconds { get; set; } = 5;
+
     public DelayPresets DelayPresets { get; set; } = new();
 
     public ZoneConfig Zone { get; set; } = new();
@@ -27,6 +29,7 @@ internal sealed class AppConfig
         Fullscreen ??= new FullscreenConfig();
 
         TriggerDelayMs = Math.Clamp(TriggerDelayMs, 50, 15000);
+        AutohideStatePollSeconds = Math.Clamp(AutohideStatePollSeconds, 5, 300);
         DelayPresets.Normalize();
         Zone.Normalize();
         Detection.Normalize();
@@ -90,13 +93,11 @@ internal sealed class DetectionConfig
 
 internal sealed class TriggerConfig
 {
-    public TriggerStrategy Strategy { get; set; } = TriggerStrategy.NoMoveThenNudge;
-    public int NudgePx { get; set; } = 1;
+    public TriggerStrategy Strategy { get; set; } = TriggerStrategy.NoMoveOnly;
     public int CooldownMs { get; set; } = 500;
 
     public void Normalize()
     {
-        NudgePx = Math.Clamp(NudgePx, 1, 5);
         CooldownMs = Math.Clamp(CooldownMs, 0, 10000);
     }
 }
@@ -129,7 +130,7 @@ internal enum DetectionBackend
 
 internal enum TriggerStrategy
 {
-    NoMoveThenNudge
+    NoMoveOnly
 }
 
 internal enum DelayPreset

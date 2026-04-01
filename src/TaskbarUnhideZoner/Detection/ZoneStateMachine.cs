@@ -54,7 +54,7 @@ internal sealed class ZoneStateMachine
                 return true;
 
             case ZoneState.TriggeredCooldown:
-                if (!inZone && nowMs >= _cooldownUntilMs)
+                if (!inZone)
                 {
                     _state = ZoneState.OutsideZone;
                 }
