@@ -16,6 +16,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private bool _baselineAutoHideEnabled;
     private bool _managedVisibleActive;
     private DateTime _lastStateWriteUtc;
+    private string? _monitoringError;
 
     public RuntimeController(AppConfig config)
     {
@@ -44,6 +45,17 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             lock (_sync)
             {
                 return Config.Enabled && !_baselineAutoHideEnabled && !_managedVisibleActive;
+            }
+        }
+    }
+
+    public string? MonitoringError
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _monitoringError;
             }
         }
     }
@@ -96,8 +108,14 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void SetEdgePosition(EdgePosition edge)
     {
+        SetEdgeZone(edge, Config.Zone.EdgeThicknessPx);
+    }
+
+    public void SetEdgeZone(EdgePosition edge, int thicknessPx)
+    {
         Config.Zone.Mode = ZoneMode.EdgeBar;
         Config.Zone.Edge = edge;
+        Config.Zone.EdgeThicknessPx = Math.Clamp(thicknessPx, 1, 400);
         Save();
     }
 
@@ -207,7 +225,16 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         var shouldRun = Config.Enabled && (_baselineAutoHideEnabled || _managedVisibleActive);
         if (shouldRun)
         {
-            _engine.Start();
+            try
+            {
+                _engine.Start();
+                _monitoringError = null;
+            }
+            catch (Exception ex)
+            {
+                _monitoringError = ex.Message;
+                _engine.Stop();
+            }
         }
         else
         {

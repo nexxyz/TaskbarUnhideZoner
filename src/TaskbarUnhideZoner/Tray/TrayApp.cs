@@ -17,7 +17,6 @@ internal sealed class TrayApp : ApplicationContext
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
     private ToolStripMenuItem? _zoneMenu;
-    private ToolStripMenuItem? _drawHotZoneItem;
     private ToolStripMenuItem? _autohideInfoItem;
     private ToolStripMenuItem? _backendInfoItem;
 
@@ -98,30 +97,38 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         var suspendedByAutohide = _runtime.IsAutohideOffSuspended;
+        var monitorError = _runtime.MonitoringError;
+        var monitorUnavailable = !string.IsNullOrWhiteSpace(monitorError);
         var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
             ? _runtime.Config.Zone.Edge.ToString()
             : "Hot Zone";
 
         _notifyIcon.Text = suspendedByAutohide
             ? "Taskbar Unhide Zoner (Autohide Off)"
+            : monitorUnavailable
+                ? "Taskbar Unhide Zoner (Monitoring Unavailable)"
             : _runtime.Config.Enabled
                 ? $"Taskbar Unhide Zoner ({zoneMode})"
                 : "Taskbar Unhide Zoner (Disabled)";
 
-        _enabledItem.Enabled = !suspendedByAutohide;
-        _enabledItem.Checked = _runtime.Config.Enabled && !suspendedByAutohide;
+        _enabledItem.Enabled = !suspendedByAutohide && !monitorUnavailable;
+        _enabledItem.Checked = _runtime.Config.Enabled && !suspendedByAutohide && !monitorUnavailable;
         _enabledItem.Text = suspendedByAutohide
             ? "Disabled - taskbar autohide is off"
+            : monitorUnavailable
+                ? "Disabled - mouse hook monitoring unavailable"
             : "Enable Taskbar Unhide Zoner";
 
-        var interactive = !suspendedByAutohide;
+        var interactive = !suspendedByAutohide && !monitorUnavailable;
         if (_delayMenu != null) _delayMenu.Enabled = interactive;
         if (_zoneMenu != null) _zoneMenu.Enabled = interactive;
-        if (_drawHotZoneItem != null) _drawHotZoneItem.Enabled = interactive;
 
         if (_autohideInfoItem != null)
         {
-            _autohideInfoItem.Visible = suspendedByAutohide;
+            _autohideInfoItem.Visible = suspendedByAutohide || monitorUnavailable;
+            _autohideInfoItem.Text = suspendedByAutohide
+                ? "Turn on taskbar autohide in Windows settings to use this app"
+                : "Mouse hook monitoring could not start";
         }
 
         if (_backendInfoItem != null)
@@ -192,20 +199,6 @@ internal sealed class TrayApp : ApplicationContext
         var openConfig = new ToolStripMenuItem("Open Config");
         openConfig.Click += (_, _) => OpenFile(Paths.ConfigFilePath);
 
-        _drawHotZoneItem = new ToolStripMenuItem("Draw Hot Zone...");
-        _drawHotZoneItem.Click += (_, _) =>
-        {
-            var rect = HotZoneOverlayForm.SelectRectangle();
-            if (rect == null)
-            {
-                return;
-            }
-
-            _runtime.SetHotZone(rect.Value);
-            _runtime.ReinitializeDetection();
-            RefreshUiState();
-        };
-
         _backendInfoItem = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
         {
             Enabled = false
@@ -224,7 +217,6 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(startupItem);
         menu.Items.Add(_delayMenu);
         menu.Items.Add(_zoneMenu);
-        menu.Items.Add(_drawHotZoneItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_autohideInfoItem);
         menu.Items.Add(_backendInfoItem);
@@ -289,7 +281,18 @@ internal sealed class TrayApp : ApplicationContext
                 return;
             }
 
-            _runtime.SetEdgePosition(edge);
+            var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge);
+            if (rect == null)
+            {
+                UpdateChecks();
+                return;
+            }
+
+            var thickness = edge is EdgePosition.Top or EdgePosition.Bottom
+                ? rect.Value.Height
+                : rect.Value.Width;
+
+            _runtime.SetEdgeZone(edge, thickness);
             _runtime.ReinitializeDetection();
             UpdateChecks();
             RefreshUiState();
@@ -302,7 +305,14 @@ internal sealed class TrayApp : ApplicationContext
                 return;
             }
 
-            _runtime.SetZoneMode(ZoneMode.HotZone);
+            var rect = HotZoneOverlayForm.SelectRectangle();
+            if (rect == null)
+            {
+                UpdateChecks();
+                return;
+            }
+
+            _runtime.SetHotZone(rect.Value);
             _runtime.ReinitializeDetection();
             UpdateChecks();
             RefreshUiState();

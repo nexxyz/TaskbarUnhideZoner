@@ -9,6 +9,7 @@ internal static class HarnessRunner
     public static int Run(string[] args)
     {
         RollingFileLogger.Info("HARNESS_START");
+        var originalConfigText = File.Exists(Paths.ConfigFilePath) ? File.ReadAllText(Paths.ConfigFilePath) : null;
 
         try
         {
@@ -33,6 +34,27 @@ internal static class HarnessRunner
         {
             RollingFileLogger.Error($"HARNESS_RESULT:FAIL {ex}");
             return 10;
+        }
+        finally
+        {
+            try
+            {
+                if (originalConfigText == null)
+                {
+                    if (File.Exists(Paths.ConfigFilePath))
+                    {
+                        File.Delete(Paths.ConfigFilePath);
+                    }
+                }
+                else
+                {
+                    File.WriteAllText(Paths.ConfigFilePath, originalConfigText);
+                }
+            }
+            catch (Exception ex)
+            {
+                RollingFileLogger.Error($"HARNESS_CONFIG_RESTORE_FAIL {ex.Message}");
+            }
         }
     }
 

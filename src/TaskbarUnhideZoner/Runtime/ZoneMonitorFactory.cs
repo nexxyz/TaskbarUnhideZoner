@@ -7,36 +7,17 @@ internal static class ZoneMonitorFactory
 {
     public static IZoneMonitor Create(AppConfig config)
     {
-        var backends = config.Detection.Backend switch
+        var backend = config.Detection.Backend switch
         {
-            DetectionBackend.MouseHook => new[] { DetectionBackend.MouseHook, DetectionBackend.Polling },
-            DetectionBackend.Polling => new[] { DetectionBackend.Polling },
-            _ => new[] { DetectionBackend.MouseHook, DetectionBackend.Polling }
+            DetectionBackend.Polling => DetectionBackend.Polling,
+            _ => DetectionBackend.MouseHook
         };
 
-        Exception? lastError = null;
-
-        foreach (var backend in backends)
+        return backend switch
         {
-            try
-            {
-                IZoneMonitor monitor = backend switch
-                {
-                    DetectionBackend.MouseHook => new MouseHookZoneMonitor(),
-                    DetectionBackend.Polling => new PollingZoneMonitor(config.Detection.PollIntervalMs),
-                    _ => throw new ArgumentOutOfRangeException()
-                };
-
-                monitor.Start();
-                monitor.Stop();
-                return monitor;
-            }
-            catch (Exception ex)
-            {
-                lastError = ex;
-            }
-        }
-
-        throw new InvalidOperationException("No zone monitor backend could be initialized.", lastError);
+            DetectionBackend.MouseHook => new MouseHookZoneMonitor(),
+            DetectionBackend.Polling => new PollingZoneMonitor(config.Detection.PollIntervalMs),
+            _ => throw new ArgumentOutOfRangeException()
+        };
     }
 }

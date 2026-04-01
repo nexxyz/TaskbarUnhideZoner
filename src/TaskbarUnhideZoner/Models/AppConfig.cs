@@ -82,11 +82,16 @@ internal sealed class RectConfig
 
 internal sealed class DetectionConfig
 {
-    public DetectionBackend Backend { get; set; } = DetectionBackend.Auto;
+    public DetectionBackend Backend { get; set; } = DetectionBackend.MouseHook;
     public int PollIntervalMs { get; set; } = 33;
 
     public void Normalize()
     {
+        if (!Enum.IsDefined(typeof(DetectionBackend), Backend))
+        {
+            Backend = DetectionBackend.MouseHook;
+        }
+
         PollIntervalMs = Math.Clamp(PollIntervalMs, 10, 250);
     }
 }
@@ -123,7 +128,6 @@ internal enum EdgePosition
 
 internal enum DetectionBackend
 {
-    Auto,
     MouseHook,
     Polling
 }

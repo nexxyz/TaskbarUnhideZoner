@@ -8,8 +8,14 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
 {
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     private readonly object _sync = new();
+    private readonly object _latestSync = new();
     private NativeMethods.LowLevelMouseProc? _proc;
     private IntPtr _hookHandle;
+    private System.Threading.Timer? _dispatchTimer;
+    private bool _running;
+    private bool _hasLatest;
+    private System.Drawing.Point _latestPoint;
+    private long _latestElapsedMs;
 
     public string Name => "mouse-hook";
 
@@ -19,7 +25,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
     {
         lock (_sync)
         {
-            if (_hookHandle != IntPtr.Zero)
+            if (_running)
             {
                 return;
             }
@@ -32,6 +38,9 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
                 var errorCode = Marshal.GetLastWin32Error();
                 throw new InvalidOperationException($"SetWindowsHookEx failed with error {errorCode}.");
             }
+
+            _dispatchTimer = new System.Threading.Timer(OnDispatchTick, null, 15, 15);
+            _running = true;
         }
     }
 
@@ -39,14 +48,27 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
     {
         lock (_sync)
         {
-            if (_hookHandle == IntPtr.Zero)
+            if (!_running)
             {
                 return;
             }
 
-            NativeMethods.UnhookWindowsHookEx(_hookHandle);
+            _dispatchTimer?.Dispose();
+            _dispatchTimer = null;
+
+            if (_hookHandle != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWindowsHookEx(_hookHandle);
+            }
+
             _hookHandle = IntPtr.Zero;
             _proc = null;
+            _running = false;
+
+            lock (_latestSync)
+            {
+                _hasLatest = false;
+            }
         }
     }
 
@@ -63,11 +85,35 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
             if (msg == NativeMethods.WmMouseMove || msg == NativeMethods.WmNcMouseMove)
             {
                 var data = Marshal.PtrToStructure<NativeMethods.MsLlHookStruct>(lParam);
-                var point = new System.Drawing.Point(data.Pt.X, data.Pt.Y);
-                CursorPositionChanged?.Invoke(this, new CursorPositionEventArgs(point, _stopwatch.ElapsedMilliseconds));
+                lock (_latestSync)
+                {
+                    _latestPoint = new System.Drawing.Point(data.Pt.X, data.Pt.Y);
+                    _latestElapsedMs = _stopwatch.ElapsedMilliseconds;
+                    _hasLatest = true;
+                }
             }
         }
 
         return NativeMethods.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+    }
+
+    private void OnDispatchTick(object? _)
+    {
+        System.Drawing.Point point;
+        long elapsedMs;
+
+        lock (_latestSync)
+        {
+            if (!_hasLatest)
+            {
+                return;
+            }
+
+            point = _latestPoint;
+            elapsedMs = _latestElapsedMs;
+            _hasLatest = false;
+        }
+
+        CursorPositionChanged?.Invoke(this, new CursorPositionEventArgs(point, elapsedMs));
     }
 }
