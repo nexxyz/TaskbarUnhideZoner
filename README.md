@@ -9,7 +9,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - Runs in the Windows notification area (tray), no main window.
 - Reveals the taskbar when your cursor enters a configured zone and stays there for a dwell time.
 - Supports edge zones (top/bottom/left/right) and a custom hot-zone rectangle.
-- Lets you draw the hot zone directly on screen (`Esc` cancels).
+- Selecting any zone from the menu opens an overlay to define that zone (`Esc` cancels).
 - Supports quick toggles from tray menu (enable/disable, startup, delay preset, zone mode).
 - Uses no cursor hijacking in normal app behavior (no pointer nudging).
 
@@ -51,8 +51,9 @@ dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj
 2. Left-click or right-click the icon to open the menu.
 3. Configure:
    - `Trigger Delay` (`Quick`, `Default`, `Long`)
-   - `Zone` (`Edge Bar` or `Hot Zone`)
-   - `Draw Hot Zone...` to select a rectangle on screen
+   - `Zone`:
+     - `Top/Bottom/Left/Right` opens an overlay and lets you click thickness for a full-width/full-height edge zone
+     - `Hot Zone` opens a freeform rectangle draw overlay
 4. Keep `Enable Taskbar Unhide Zoner` checked.
 
 ### Notes about auto-hide
@@ -86,8 +87,10 @@ You can edit this file directly while the app is not running. Main fields:
   - Confirm app tray menu shows enabled state.
   - Try `Quick` delay preset.
 - Hot zone seems wrong:
-  - Re-draw using `Draw Hot Zone...`.
+  - Re-select `Zone -> Hot Zone` to redraw.
   - Check `HotZone` coordinates in config.
+- Edge zone seems too thin/thick:
+  - Re-select the edge (`Zone -> Top/Bottom/Left/Right`) and click a new thickness in the overlay.
 - App seems inactive in fullscreen apps:
   - This is expected when fullscreen suspension is enabled.
 

@@ -23,9 +23,8 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
   - Start with Windows toggle
   - Trigger delay presets: Quick / Default / Long
   - Zone mode selection:
-    - Edge bar (top, bottom, left, right + thickness)
-    - Hot zone rectangle
-- Draw Hot Zone action (drag rectangle overlay, `Esc` to cancel)
+    - Edge bar (top, bottom, left, right) with overlay-based thickness selection
+    - Hot zone rectangle via drag overlay
 - Open config file
 - Exit
 - Settings are persisted and restored on next launch.
@@ -45,8 +44,8 @@ Expected configurable fields:
 - Zone mode (`EdgeBar` or `HotZone`)
 - Edge settings (`edge`, `edgeThicknessPx`)
 - Hot zone rectangle (`x`, `y`, `width`, `height`) in virtual-screen coordinates
-- Detection backend mode (`Auto`, plus explicit backend override)
-- Poll interval (if polling backend is used)
+- Detection backend mode (`MouseHook` default, optional explicit `Polling` for diagnostics)
+- Poll interval (only used if explicit polling backend is selected)
 - Trigger behavior settings (`cooldownMs`, strategy)
 - Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
 - Autohide state check interval (`autohideStatePollSeconds`, default 5)
@@ -55,12 +54,15 @@ Expected configurable fields:
 
 Do not hard-commit to one detection mechanism up front. Implement a pluggable monitor abstraction and choose defaults after practical validation.
 
-Candidate zone-entry backends:
+Primary zone-entry backend:
 
-- Event-driven low-level mouse hook (`WH_MOUSE_LL`)
+- Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing
+
+Optional diagnostic backend:
+
 - Cursor position polling (`GetCursorPos` + timer)
 
-Shared logic (backend-agnostic):
+Shared logic:
 
 - Zone hit-testing
 - Dwell timing
@@ -94,6 +96,9 @@ Taskbar reveal strategy:
 - Conflict avoidance with our own toggles:
   - Track app-initiated state changes separately from external/manual changes.
   - If external/manual change is detected, adopt it as the new baseline and avoid thrashing.
+- Monitoring backend policy:
+  - Do not silently fallback to another backend at runtime.
+  - If mouse hook initialization fails, surface a clear disabled/unavailable status in the tray UI.
 - Safety:
   - On exit, restore state only if this app changed it.
   - Do not leave taskbar state unintentionally altered after normal shutdown.
@@ -158,7 +163,7 @@ Unit tests where they add value (pure logic and deterministic behavior), especia
 
 - Zone hit-testing math (edge bars + arbitrary rectangles)
 - Dwell timer state machine (enter/leave/re-enter/cooldown)
-- Config load/save/validation and defaults/fallback behavior
+- Config load/save/validation and defaults
 - Preset mapping behavior
 
 Avoid over-mocking native APIs for unit tests; isolate those APIs behind interfaces and test logic around them.
@@ -189,7 +194,7 @@ The following scenarios define the baseline verification matrix. Each item shoul
 - Taskbar located on non-primary monitor still reveals from configured zone (`Manual`).
 - Mixed monitor layout with negative virtual coordinates still matches configured hot zone (`Manual`).
 - Explorer restart (`explorer.exe`) does not leave app in a crash loop; tray behavior recovers or exits gracefully (`Manual`).
-- Detection backend fallback path works when preferred backend cannot initialize (`Harness` + `Manual`).
+- If mouse hook initialization fails, app surfaces monitoring-unavailable state without silent backend switching (`Manual`).
 - Fullscreen-app interaction does not crash the process during cursor movement and zone entry (`Manual`).
 - Fullscreen foreground app causes trigger suspension, and normal triggering resumes after leaving fullscreen (`Manual` + `Harness` where feasible).
 - If taskbar autohide is disabled in Windows settings, monitoring suspends and tray status reflects disabled-by-autohide-off state (`Manual` + `Harness`).
@@ -216,7 +221,7 @@ Harness execution contract:
 - `Startup`
   - HKCU Run key integration
 - `Detection`
-  - `IZoneMonitor` abstraction + backend implementations
+  - `IZoneMonitor` abstraction (mouse-hook primary, polling optional diagnostic mode)
   - zone evaluator and dwell engine
 - `Trigger`
   - no-move taskbar state strategy and restore logic
@@ -235,8 +240,8 @@ Harness execution contract:
 ## Milestones
 
 1. Scaffold app shell (single instance, tray icon, context menu, config persistence, startup toggle).
-2. Implement zone model, dwell logic, and one backend.
-3. Add second backend and backend selection (`Auto` + override).
+2. Implement zone model, dwell logic, and mouse-hook backend.
+3. Add optional polling backend for diagnostics only (no silent runtime fallback).
 4. Implement strict no-move taskbar state strategy (`ABM_GETSTATE` / `ABM_SETSTATE`).
 5. Implement hot-zone draw overlay (`Esc` cancel).
 6. Add unit tests for logic modules.
