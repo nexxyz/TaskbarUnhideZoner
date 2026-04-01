@@ -1,0 +1,290 @@
+using System.Runtime.InteropServices;
+using TaskbarUnhideZoner.Config;
+using TaskbarUnhideZoner.Logging;
+using TaskbarUnhideZoner.Models;
+using TaskbarUnhideZoner.Runtime;
+using TaskbarUnhideZoner.UI;
+
+namespace TaskbarUnhideZoner.Tray;
+
+internal sealed class TrayApp : ApplicationContext
+{
+    private readonly RuntimeController _runtime;
+    private readonly NotifyIcon _notifyIcon;
+    private bool _initializing = true;
+
+    public TrayApp(RuntimeController runtime)
+    {
+        _runtime = runtime;
+        _notifyIcon = new NotifyIcon
+        {
+            Icon = LoadTrayIcon(),
+            Visible = true,
+            Text = "Taskbar Unhide Zoner",
+            ContextMenuStrip = BuildMenu()
+        };
+
+        _notifyIcon.MouseUp += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left)
+            {
+                return;
+            }
+
+            _notifyIcon.ContextMenuStrip?.Show(Cursor.Position);
+        };
+
+        _initializing = false;
+        RefreshTrayText();
+    }
+
+    private static Icon LoadTrayIcon()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "assets", "Taskbar Unhide Zoner.png");
+            if (File.Exists(iconPath))
+            {
+                using var bitmap = new Bitmap(iconPath);
+                var handle = bitmap.GetHicon();
+                try
+                {
+                    using var icon = Icon.FromHandle(handle);
+                    return (Icon)icon.Clone();
+                }
+                finally
+                {
+                    DestroyIcon(handle);
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return SystemIcons.Application;
+    }
+
+    private void RefreshTrayText()
+    {
+        var mode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar ? _runtime.Config.Zone.Edge.ToString() : "Hot Zone";
+        _notifyIcon.Text = _runtime.Config.Enabled
+            ? $"Taskbar Unhide Zoner ({mode})"
+            : "Taskbar Unhide Zoner (Disabled)";
+    }
+
+    private void Exit()
+    {
+        try
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+        }
+        catch
+        {
+        }
+
+        Application.Exit();
+    }
+
+    private ContextMenuStrip BuildMenu()
+    {
+        var menu = new ContextMenuStrip();
+
+        var enabledItem = new ToolStripMenuItem("Enable Taskbar Unhide Zoner")
+        {
+            CheckOnClick = true,
+            Checked = _runtime.Config.Enabled
+        };
+        enabledItem.CheckedChanged += (_, _) =>
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetEnabled(enabledItem.Checked);
+            RefreshTrayText();
+        };
+
+        var startupItem = new ToolStripMenuItem("Start with Windows")
+        {
+            CheckOnClick = true,
+            Checked = _runtime.Config.StartWithWindows
+        };
+        startupItem.CheckedChanged += (_, _) =>
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetStartup(startupItem.Checked);
+        };
+
+        var delayMenu = BuildDelayMenu();
+        var zoneMenu = BuildZoneMenu();
+
+        var openConfig = new ToolStripMenuItem("Open Config");
+        openConfig.Click += (_, _) => OpenFile(Paths.ConfigFilePath);
+
+        var drawHotZone = new ToolStripMenuItem("Draw Hot Zone...");
+        drawHotZone.Click += (_, _) =>
+        {
+            var rect = HotZoneOverlayForm.SelectRectangle();
+            if (rect == null)
+            {
+                return;
+            }
+
+            _runtime.SetHotZone(rect.Value);
+            _runtime.ReinitializeDetection();
+            RefreshTrayText();
+        };
+
+        var backendInfo = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
+        {
+            Enabled = false
+        };
+
+        var exitItem = new ToolStripMenuItem("Exit");
+        exitItem.Click += (_, _) => Exit();
+
+        menu.Items.Add(enabledItem);
+        menu.Items.Add(startupItem);
+        menu.Items.Add(delayMenu);
+        menu.Items.Add(zoneMenu);
+        menu.Items.Add(drawHotZone);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(backendInfo);
+        menu.Items.Add(openConfig);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(exitItem);
+
+        return menu;
+    }
+
+    private ToolStripMenuItem BuildDelayMenu()
+    {
+        var menu = new ToolStripMenuItem("Trigger Delay");
+        var quick = new ToolStripMenuItem("Quick") { CheckOnClick = true };
+        var normal = new ToolStripMenuItem("Default") { CheckOnClick = true };
+        var longDelay = new ToolStripMenuItem("Long") { CheckOnClick = true };
+
+        void SetPreset(DelayPreset preset)
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetDelayPreset(preset);
+            var selectedMs = _runtime.Config.TriggerDelayMs;
+            quick.Checked = selectedMs == _runtime.Config.DelayPresets.QuickMs;
+            normal.Checked = selectedMs == _runtime.Config.DelayPresets.DefaultMs;
+            longDelay.Checked = selectedMs == _runtime.Config.DelayPresets.LongMs;
+        }
+
+        quick.Click += (_, _) => SetPreset(DelayPreset.Quick);
+        normal.Click += (_, _) => SetPreset(DelayPreset.Default);
+        longDelay.Click += (_, _) => SetPreset(DelayPreset.Long);
+
+        var delayMs = _runtime.Config.TriggerDelayMs;
+        quick.Checked = delayMs == _runtime.Config.DelayPresets.QuickMs;
+        normal.Checked = delayMs == _runtime.Config.DelayPresets.DefaultMs;
+        longDelay.Checked = delayMs == _runtime.Config.DelayPresets.LongMs;
+
+        menu.DropDownItems.Add(quick);
+        menu.DropDownItems.Add(normal);
+        menu.DropDownItems.Add(longDelay);
+        return menu;
+    }
+
+    private ToolStripMenuItem BuildZoneMenu()
+    {
+        var menu = new ToolStripMenuItem("Zone");
+
+        var edgeMenu = new ToolStripMenuItem("Edge Bar");
+        var top = new ToolStripMenuItem("Top") { CheckOnClick = true };
+        var bottom = new ToolStripMenuItem("Bottom") { CheckOnClick = true };
+        var left = new ToolStripMenuItem("Left") { CheckOnClick = true };
+        var right = new ToolStripMenuItem("Right") { CheckOnClick = true };
+        var hotZone = new ToolStripMenuItem("Hot Zone") { CheckOnClick = true };
+
+        void SetEdge(EdgePosition edge)
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetEdgePosition(edge);
+            _runtime.ReinitializeDetection();
+            UpdateChecks();
+            RefreshTrayText();
+        }
+
+        void SetHotZone()
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetZoneMode(ZoneMode.HotZone);
+            _runtime.ReinitializeDetection();
+            UpdateChecks();
+            RefreshTrayText();
+        }
+
+        void UpdateChecks()
+        {
+            var isEdge = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar;
+            top.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Top;
+            bottom.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Bottom;
+            left.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Left;
+            right.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Right;
+            hotZone.Checked = _runtime.Config.Zone.Mode == ZoneMode.HotZone;
+        }
+
+        top.Click += (_, _) => SetEdge(EdgePosition.Top);
+        bottom.Click += (_, _) => SetEdge(EdgePosition.Bottom);
+        left.Click += (_, _) => SetEdge(EdgePosition.Left);
+        right.Click += (_, _) => SetEdge(EdgePosition.Right);
+        hotZone.Click += (_, _) => SetHotZone();
+
+        edgeMenu.DropDownItems.Add(top);
+        edgeMenu.DropDownItems.Add(bottom);
+        edgeMenu.DropDownItems.Add(left);
+        edgeMenu.DropDownItems.Add(right);
+        menu.DropDownItems.Add(edgeMenu);
+        menu.DropDownItems.Add(hotZone);
+
+        UpdateChecks();
+        return menu;
+    }
+
+    private static void OpenFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            RollingFileLogger.Error($"Failed to open file '{path}': {ex.Message}");
+        }
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+}
