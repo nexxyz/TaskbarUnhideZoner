@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TaskbarUnhideZoner.Tests/TaskbarUnhideZoner.Tests.csproj" />
+  </Folder>
+</Solution>
