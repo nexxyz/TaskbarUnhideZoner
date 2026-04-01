@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Threading;
 using TaskbarUnhideZoner.Config;
 using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Models;
@@ -11,11 +12,21 @@ internal sealed class TrayApp : ApplicationContext
 {
     private readonly RuntimeController _runtime;
     private readonly NotifyIcon _notifyIcon;
+    private readonly SynchronizationContext? _uiContext;
+
+    private ToolStripMenuItem? _enabledItem;
+    private ToolStripMenuItem? _delayMenu;
+    private ToolStripMenuItem? _zoneMenu;
+    private ToolStripMenuItem? _drawHotZoneItem;
+    private ToolStripMenuItem? _autohideInfoItem;
+    private ToolStripMenuItem? _backendInfoItem;
+
     private bool _initializing = true;
 
     public TrayApp(RuntimeController runtime)
     {
         _runtime = runtime;
+        _uiContext = SynchronizationContext.Current;
         _notifyIcon = new NotifyIcon
         {
             Icon = LoadTrayIcon(),
@@ -24,6 +35,8 @@ internal sealed class TrayApp : ApplicationContext
             ContextMenuStrip = BuildMenu()
         };
 
+        _runtime.StateChanged += OnRuntimeStateChanged;
+
         _notifyIcon.MouseUp += (_, e) =>
         {
             if (e.Button != MouseButtons.Left)
@@ -31,11 +44,12 @@ internal sealed class TrayApp : ApplicationContext
                 return;
             }
 
+            _runtime.RefreshAutohideState();
             _notifyIcon.ContextMenuStrip?.Show(Cursor.Position);
         };
 
         _initializing = false;
-        RefreshTrayText();
+        RefreshUiState();
     }
 
     private static Icon LoadTrayIcon()
@@ -65,16 +79,61 @@ internal sealed class TrayApp : ApplicationContext
         return SystemIcons.Application;
     }
 
-    private void RefreshTrayText()
+    private void OnRuntimeStateChanged(object? sender, EventArgs e)
     {
-        var mode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar ? _runtime.Config.Zone.Edge.ToString() : "Hot Zone";
-        _notifyIcon.Text = _runtime.Config.Enabled
-            ? $"Taskbar Unhide Zoner ({mode})"
-            : "Taskbar Unhide Zoner (Disabled)";
+        if (_uiContext == null)
+        {
+            RefreshUiState();
+            return;
+        }
+
+        _uiContext.Post(_ => RefreshUiState(), null);
+    }
+
+    private void RefreshUiState()
+    {
+        if (_enabledItem == null)
+        {
+            return;
+        }
+
+        var suspendedByAutohide = _runtime.IsAutohideOffSuspended;
+        var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
+            ? _runtime.Config.Zone.Edge.ToString()
+            : "Hot Zone";
+
+        _notifyIcon.Text = suspendedByAutohide
+            ? "Taskbar Unhide Zoner (Autohide Off)"
+            : _runtime.Config.Enabled
+                ? $"Taskbar Unhide Zoner ({zoneMode})"
+                : "Taskbar Unhide Zoner (Disabled)";
+
+        _enabledItem.Enabled = !suspendedByAutohide;
+        _enabledItem.Checked = _runtime.Config.Enabled && !suspendedByAutohide;
+        _enabledItem.Text = suspendedByAutohide
+            ? "Disabled - taskbar autohide is off"
+            : "Enable Taskbar Unhide Zoner";
+
+        var interactive = !suspendedByAutohide;
+        if (_delayMenu != null) _delayMenu.Enabled = interactive;
+        if (_zoneMenu != null) _zoneMenu.Enabled = interactive;
+        if (_drawHotZoneItem != null) _drawHotZoneItem.Enabled = interactive;
+
+        if (_autohideInfoItem != null)
+        {
+            _autohideInfoItem.Visible = suspendedByAutohide;
+        }
+
+        if (_backendInfoItem != null)
+        {
+            _backendInfoItem.Text = $"Backend: {_runtime.ActiveBackend}";
+        }
     }
 
     private void Exit()
     {
+        _runtime.StateChanged -= OnRuntimeStateChanged;
+
         try
         {
             _notifyIcon.Visible = false;
@@ -90,21 +149,26 @@ internal sealed class TrayApp : ApplicationContext
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
+        menu.Opening += (_, _) =>
+        {
+            _runtime.RefreshAutohideState();
+            RefreshUiState();
+        };
 
-        var enabledItem = new ToolStripMenuItem("Enable Taskbar Unhide Zoner")
+        _enabledItem = new ToolStripMenuItem("Enable Taskbar Unhide Zoner")
         {
             CheckOnClick = true,
             Checked = _runtime.Config.Enabled
         };
-        enabledItem.CheckedChanged += (_, _) =>
+        _enabledItem.CheckedChanged += (_, _) =>
         {
             if (_initializing)
             {
                 return;
             }
 
-            _runtime.SetEnabled(enabledItem.Checked);
-            RefreshTrayText();
+            _runtime.SetEnabled(_enabledItem.Checked);
+            RefreshUiState();
         };
 
         var startupItem = new ToolStripMenuItem("Start with Windows")
@@ -122,14 +186,14 @@ internal sealed class TrayApp : ApplicationContext
             _runtime.SetStartup(startupItem.Checked);
         };
 
-        var delayMenu = BuildDelayMenu();
-        var zoneMenu = BuildZoneMenu();
+        _delayMenu = BuildDelayMenu();
+        _zoneMenu = BuildZoneMenu();
 
         var openConfig = new ToolStripMenuItem("Open Config");
         openConfig.Click += (_, _) => OpenFile(Paths.ConfigFilePath);
 
-        var drawHotZone = new ToolStripMenuItem("Draw Hot Zone...");
-        drawHotZone.Click += (_, _) =>
+        _drawHotZoneItem = new ToolStripMenuItem("Draw Hot Zone...");
+        _drawHotZoneItem.Click += (_, _) =>
         {
             var rect = HotZoneOverlayForm.SelectRectangle();
             if (rect == null)
@@ -139,24 +203,31 @@ internal sealed class TrayApp : ApplicationContext
 
             _runtime.SetHotZone(rect.Value);
             _runtime.ReinitializeDetection();
-            RefreshTrayText();
+            RefreshUiState();
         };
 
-        var backendInfo = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
+        _backendInfoItem = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
         {
             Enabled = false
+        };
+
+        _autohideInfoItem = new ToolStripMenuItem("Turn on taskbar autohide in Windows settings to use this app")
+        {
+            Enabled = false,
+            Visible = false
         };
 
         var exitItem = new ToolStripMenuItem("Exit");
         exitItem.Click += (_, _) => Exit();
 
-        menu.Items.Add(enabledItem);
+        menu.Items.Add(_enabledItem);
         menu.Items.Add(startupItem);
-        menu.Items.Add(delayMenu);
-        menu.Items.Add(zoneMenu);
-        menu.Items.Add(drawHotZone);
+        menu.Items.Add(_delayMenu);
+        menu.Items.Add(_zoneMenu);
+        menu.Items.Add(_drawHotZoneItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(backendInfo);
+        menu.Items.Add(_autohideInfoItem);
+        menu.Items.Add(_backendInfoItem);
         menu.Items.Add(openConfig);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(exitItem);
@@ -221,7 +292,7 @@ internal sealed class TrayApp : ApplicationContext
             _runtime.SetEdgePosition(edge);
             _runtime.ReinitializeDetection();
             UpdateChecks();
-            RefreshTrayText();
+            RefreshUiState();
         }
 
         void SetHotZone()
@@ -234,7 +305,7 @@ internal sealed class TrayApp : ApplicationContext
             _runtime.SetZoneMode(ZoneMode.HotZone);
             _runtime.ReinitializeDetection();
             UpdateChecks();
-            RefreshTrayText();
+            RefreshUiState();
         }
 
         void UpdateChecks()

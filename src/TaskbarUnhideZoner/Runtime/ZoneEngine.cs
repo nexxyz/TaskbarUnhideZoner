@@ -7,16 +7,17 @@ namespace TaskbarUnhideZoner.Runtime;
 internal sealed class ZoneEngine : IDisposable
 {
     private readonly AppConfig _config;
-    private readonly TaskbarTriggerService _triggerService;
+    private readonly IZoneActivationHandler _handler;
     private readonly ZoneStateMachine _stateMachine;
     private readonly object _sync = new();
     private IZoneMonitor? _monitor;
     private bool _running;
+    private bool _zoneTriggered;
 
-    public ZoneEngine(AppConfig config, TaskbarTriggerService triggerService)
+    public ZoneEngine(AppConfig config, IZoneActivationHandler handler)
     {
         _config = config;
-        _triggerService = triggerService;
+        _handler = handler;
         _stateMachine = new ZoneStateMachine(
             triggerDelayMs: () => _config.TriggerDelayMs,
             cooldownMs: () => _config.Trigger.CooldownMs);
@@ -57,6 +58,7 @@ internal sealed class ZoneEngine : IDisposable
             }
 
             _stateMachine.ForceOutside();
+            _zoneTriggered = false;
             _running = false;
         }
     }
@@ -76,16 +78,29 @@ internal sealed class ZoneEngine : IDisposable
     {
         if (_config.Fullscreen.SuspendWhenFullscreenAppActive && FullscreenDetector.IsForegroundFullscreen())
         {
+            if (_zoneTriggered)
+            {
+                _handler.OnZoneLeft();
+                _zoneTriggered = false;
+            }
+
             _stateMachine.ForceOutside();
             return;
         }
 
         var inZone = ZoneGeometry.IsInZone(_config.Zone, e.Position, SystemInformation.VirtualScreen);
+        if (_zoneTriggered && !inZone)
+        {
+            _handler.OnZoneLeft();
+            _zoneTriggered = false;
+        }
+
         if (!_stateMachine.Update(inZone, e.ElapsedMs))
         {
             return;
         }
 
-        _triggerService.Trigger(e.Position);
+        _handler.OnZoneTriggered(e.Position);
+        _zoneTriggered = true;
     }
 }

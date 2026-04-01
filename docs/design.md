@@ -1,4 +1,4 @@
-# Taskbar Unhide Zoner - Design Documentation (v1)
+# Taskbar Unhide Zoner - Design Documentation (v1.2)
 
 ## Repository scope and locations
 
@@ -30,6 +30,7 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
 - Exit
 - Settings are persisted and restored on next launch.
 - Trigger pipeline is suspended while a fullscreen foreground app is active (default behavior).
+- If taskbar autohide is off, runtime monitoring is suspended and the main enable item is shown as disabled.
 
 ## Configuration model
 
@@ -46,8 +47,9 @@ Expected configurable fields:
 - Hot zone rectangle (`x`, `y`, `width`, `height`) in virtual-screen coordinates
 - Detection backend mode (`Auto`, plus explicit backend override)
 - Poll interval (if polling backend is used)
-- Trigger behavior settings (`nudgePx`, `cooldownMs`, strategy)
+- Trigger behavior settings (`cooldownMs`, strategy)
 - Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
+- Autohide state check interval (`autohideStatePollSeconds`, default 5)
 
 ## Detection and trigger strategy
 
@@ -67,8 +69,34 @@ Shared logic (backend-agnostic):
 
 Taskbar reveal strategy:
 
-1. Try no-cursor-movement trigger path first.
-2. If reveal is not observed/reliable enough, apply tiny cursor nudge fallback (1-2 px).
+1. Strict no-move policy: cursor movement/synthetic pointer nudging is not allowed.
+2. Use `SHAppBarMessage` state control (`ABM_GETSTATE` / `ABM_SETSTATE`) for zone-driven show/restore.
+3. On zone enter (after dwell), disable autohide (show taskbar); on zone leave, restore baseline state.
+
+## No-move and autohide state decisions
+
+- No cursor movement is allowed for taskbar reveal. Any cursor-nudge/synthetic mouse movement approach is out of scope.
+- Primary reveal mechanism is taskbar state management via `SHAppBarMessage` (`ABM_GETSTATE` / `ABM_SETSTATE`).
+- Zone behavior:
+  - On dwell-complete zone enter: disable autohide (taskbar shown).
+  - On zone leave: restore prior autohide state.
+- If taskbar autohide is already off:
+  - Suspend zone monitoring entirely (no mouse hook/polling monitor running).
+  - Do not run trigger logic.
+- Tray UX when autohide is off:
+  - Gray out the main enable entry.
+  - Show text similar to: `Disabled - taskbar autohide is off`.
+  - Keep `Start with Windows`, `Open Config`, and `Exit` available.
+- Autohide state detection:
+  - Read with `ABM_GETSTATE` on startup.
+  - Re-check when tray menu opens.
+  - Background polling interval is low-frequency: every 5 seconds (max cadence).
+- Conflict avoidance with our own toggles:
+  - Track app-initiated state changes separately from external/manual changes.
+  - If external/manual change is detected, adopt it as the new baseline and avoid thrashing.
+- Safety:
+  - On exit, restore state only if this app changed it.
+  - Do not leave taskbar state unintentionally altered after normal shutdown.
 
 ## Zone state machine
 
@@ -90,7 +118,7 @@ Transitions:
   - Action: clear `enteredAt` and pending trigger state.
 - `InsideZoneCounting` -> `TriggeredCooldown`
   - Condition: `now - enteredAt >= triggerDelayMs`.
-  - Action: run trigger strategy (no-move first, then nudge fallback if needed), set `cooldownUntil`.
+  - Action: apply no-move taskbar state transition (show), set `cooldownUntil`.
 - `TriggeredCooldown` -> `OutsideZone`
   - Condition: cursor leaves active zone.
   - Action: clear cooldown marker after timeout and reset cycle.
@@ -164,6 +192,8 @@ The following scenarios define the baseline verification matrix. Each item shoul
 - Detection backend fallback path works when preferred backend cannot initialize (`Harness` + `Manual`).
 - Fullscreen-app interaction does not crash the process during cursor movement and zone entry (`Manual`).
 - Fullscreen foreground app causes trigger suspension, and normal triggering resumes after leaving fullscreen (`Manual` + `Harness` where feasible).
+- If taskbar autohide is disabled in Windows settings, monitoring suspends and tray status reflects disabled-by-autohide-off state (`Manual` + `Harness`).
+- If taskbar autohide is enabled while app is running, monitoring resumes within one autohide poll interval (`Manual`).
 
 Harness execution contract:
 
@@ -189,7 +219,7 @@ Harness execution contract:
   - `IZoneMonitor` abstraction + backend implementations
   - zone evaluator and dwell engine
 - `Trigger`
-  - taskbar reveal strategies and fallback chain
+  - no-move taskbar state strategy and restore logic
 - `UI`
   - temporary hot-zone selection overlay
 - `Interop`
@@ -207,7 +237,7 @@ Harness execution contract:
 1. Scaffold app shell (single instance, tray icon, context menu, config persistence, startup toggle).
 2. Implement zone model, dwell logic, and one backend.
 3. Add second backend and backend selection (`Auto` + override).
-4. Implement taskbar reveal strategy with no-move then nudge fallback.
+4. Implement strict no-move taskbar state strategy (`ABM_GETSTATE` / `ABM_SETSTATE`).
 5. Implement hot-zone draw overlay (`Esc` cancel).
 6. Add unit tests for logic modules.
 7. Add local live-test harness and logging checks.
@@ -218,6 +248,7 @@ Harness execution contract:
 - App runs as tray-only and remains stable over long sessions.
 - Left/right click behavior is consistent and reliable.
 - Enable/disable works immediately and persists.
+- If taskbar autohide is off, app suspends monitoring and clearly indicates disabled state in tray menu.
 - Delay presets and exact config values both function.
 - Edge and hot-zone modes trigger as expected.
 - Hot-zone drawing supports cancel via `Esc`.
