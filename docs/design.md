@@ -25,10 +25,11 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
   - Zone mode selection:
     - Edge bar (top, bottom, left, right + thickness)
     - Hot zone rectangle
-  - Draw Hot Zone action (drag rectangle overlay, `Esc` to cancel)
-  - Open config file
-  - Exit
+- Draw Hot Zone action (drag rectangle overlay, `Esc` to cancel)
+- Open config file
+- Exit
 - Settings are persisted and restored on next launch.
+- Trigger pipeline is suspended while a fullscreen foreground app is active (default behavior).
 
 ## Configuration model
 
@@ -46,6 +47,7 @@ Expected configurable fields:
 - Detection backend mode (`Auto`, plus explicit backend override)
 - Poll interval (if polling backend is used)
 - Trigger behavior settings (`nudgePx`, `cooldownMs`, strategy)
+- Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
 
 ## Detection and trigger strategy
 
@@ -106,6 +108,12 @@ Timing notes:
 - Dwell timing uses monotonic elapsed time.
 - Trigger decision happens immediately when dwell threshold is reached, subject to backend event cadence.
 
+Fullscreen handling:
+
+- Default policy: suspend detection/trigger execution while a fullscreen foreground app is active.
+- When fullscreen state ends, resume normal zone monitoring.
+- Goal: avoid interference and pointless trigger attempts during immersive fullscreen usage.
+
 ## Quality goals
 
 - Keep CPU and RAM usage very low.
@@ -155,6 +163,7 @@ The following scenarios define the baseline verification matrix. Each item shoul
 - Explorer restart (`explorer.exe`) does not leave app in a crash loop; tray behavior recovers or exits gracefully (`Manual`).
 - Detection backend fallback path works when preferred backend cannot initialize (`Harness` + `Manual`).
 - Fullscreen-app interaction does not crash the process during cursor movement and zone entry (`Manual`).
+- Fullscreen foreground app causes trigger suspension, and normal triggering resumes after leaving fullscreen (`Manual` + `Harness` where feasible).
 
 Harness execution contract:
 
