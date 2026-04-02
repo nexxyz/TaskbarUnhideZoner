@@ -74,7 +74,7 @@ You can edit this file directly while the app is not running. Main fields:
 - `StartWithWindows`
 - `TriggerDelayMs`
 - `DelayPresets` (`QuickMs`, `DefaultMs`, `LongMs`)
-- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `HotZone`)
+- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `EdgeZone`, `HotZone`)
 - `Detection` (`Backend`, `PollIntervalMs`)
 - `Trigger` (`CooldownMs`, `Strategy`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)
