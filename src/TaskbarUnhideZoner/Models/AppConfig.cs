@@ -14,8 +14,6 @@ internal sealed class AppConfig
 
     public ZoneConfig Zone { get; set; } = new();
 
-    public DetectionConfig Detection { get; set; } = new();
-
     public TriggerConfig Trigger { get; set; } = new();
 
     public FullscreenConfig Fullscreen { get; set; } = new();
@@ -24,7 +22,6 @@ internal sealed class AppConfig
     {
         DelayPresets ??= new DelayPresets();
         Zone ??= new ZoneConfig();
-        Detection ??= new DetectionConfig();
         Trigger ??= new TriggerConfig();
         Fullscreen ??= new FullscreenConfig();
 
@@ -32,7 +29,6 @@ internal sealed class AppConfig
         AutohideStatePollSeconds = Math.Clamp(AutohideStatePollSeconds, 5, 300);
         DelayPresets.Normalize();
         Zone.Normalize();
-        Detection.Normalize();
         Trigger.Normalize();
     }
 }
@@ -53,14 +49,10 @@ internal sealed class DelayPresets
 
 internal sealed class ZoneConfig
 {
-    public ZoneMode Mode { get; set; } = ZoneMode.EdgeBar;
-    public EdgePosition Edge { get; set; } = EdgePosition.Bottom;
-    public int EdgeThicknessPx { get; set; } = 2;
     public RectConfig ActiveZone { get; set; } = new() { X = 0, Y = 0, Width = 320, Height = 120 };
 
     public void Normalize()
     {
-        EdgeThicknessPx = Math.Clamp(EdgeThicknessPx, 1, 100);
         ActiveZone ??= new RectConfig { X = 0, Y = 0, Width = 320, Height = 120 };
         ActiveZone.Normalize();
     }
@@ -80,25 +72,8 @@ internal sealed class RectConfig
     }
 }
 
-internal sealed class DetectionConfig
-{
-    public DetectionBackend Backend { get; set; } = DetectionBackend.MouseHook;
-    public int PollIntervalMs { get; set; } = 33;
-
-    public void Normalize()
-    {
-        if (!Enum.IsDefined(typeof(DetectionBackend), Backend))
-        {
-            Backend = DetectionBackend.MouseHook;
-        }
-
-        PollIntervalMs = Math.Clamp(PollIntervalMs, 10, 250);
-    }
-}
-
 internal sealed class TriggerConfig
 {
-    public TriggerStrategy Strategy { get; set; } = TriggerStrategy.NoMoveOnly;
     public int CooldownMs { get; set; } = 500;
 
     public void Normalize()
@@ -112,29 +87,12 @@ internal sealed class FullscreenConfig
     public bool SuspendWhenFullscreenAppActive { get; set; } = true;
 }
 
-internal enum ZoneMode
-{
-    EdgeBar,
-    HotZone
-}
-
 internal enum EdgePosition
 {
     Top,
     Bottom,
     Left,
     Right
-}
-
-internal enum DetectionBackend
-{
-    MouseHook,
-    Polling
-}
-
-internal enum TriggerStrategy
-{
-    NoMoveOnly
 }
 
 internal enum DelayPreset

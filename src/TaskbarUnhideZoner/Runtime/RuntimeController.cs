@@ -37,8 +37,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public AppConfig Config { get; }
 
-    public string ActiveBackend => _engine.ActiveBackendName;
-
     public bool IsAutohideOffSuspended
     {
         get
@@ -101,33 +99,8 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         }
     }
 
-    public void SetZoneMode(ZoneMode mode)
-    {
-        Config.Zone.Mode = mode;
-        Save();
-    }
-
-    public void SetEdgePosition(EdgePosition edge)
-    {
-        var virtualScreen = SystemInformation.VirtualScreen;
-        var thickness = Math.Clamp(Config.Zone.EdgeThicknessPx, 1, 400);
-        var rectangle = edge switch
-        {
-            EdgePosition.Top => new Rectangle(virtualScreen.Left, virtualScreen.Top, virtualScreen.Width, thickness),
-            EdgePosition.Bottom => new Rectangle(virtualScreen.Left, virtualScreen.Bottom - thickness, virtualScreen.Width, thickness),
-            EdgePosition.Left => new Rectangle(virtualScreen.Left, virtualScreen.Top, thickness, virtualScreen.Height),
-            EdgePosition.Right => new Rectangle(virtualScreen.Right - thickness, virtualScreen.Top, thickness, virtualScreen.Height),
-            _ => Rectangle.Empty
-        };
-
-        SetEdgeZone(edge, rectangle);
-    }
-
     public void SetEdgeZone(EdgePosition edge, Rectangle rectangle)
     {
-        Config.Zone.Mode = ZoneMode.EdgeBar;
-        Config.Zone.Edge = edge;
-        Config.Zone.EdgeThicknessPx = Math.Clamp(edge is EdgePosition.Top or EdgePosition.Bottom ? rectangle.Height : rectangle.Width, 1, 400);
         Config.Zone.ActiveZone = new RectConfig
         {
             X = rectangle.X,
@@ -140,7 +113,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void SetHotZone(Rectangle rectangle)
     {
-        Config.Zone.Mode = ZoneMode.HotZone;
         Config.Zone.ActiveZone = new RectConfig
         {
             X = rectangle.X,

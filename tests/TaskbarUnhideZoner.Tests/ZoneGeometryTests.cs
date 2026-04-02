@@ -7,21 +7,18 @@ namespace TaskbarUnhideZoner.Tests;
 public sealed class ZoneGeometryTests
 {
     [Fact]
-    public void BottomEdgeZone_ShouldContainBottomPixels()
+    public void ActiveZone_ShouldContainInteriorPoints()
     {
         var zone = new ZoneConfig
         {
-            Mode = ZoneMode.EdgeBar,
-            Edge = EdgePosition.Bottom,
-            EdgeThicknessPx = 3
+            ActiveZone = new RectConfig { X = 0, Y = 1000, Width = 1920, Height = 120 }
         };
 
-        var screenBounds = new Rectangle(0, 0, 1920, 1080);
-        var edgeRect = ZoneGeometry.GetEdgeRectangle(zone, screenBounds);
+        var virtualScreen = new Rectangle(0, 0, 1920, 1080);
 
-        Assert.True(edgeRect.Contains(new Point(120, 1079)));
-        Assert.True(edgeRect.Contains(new Point(120, 1078)));
-        Assert.False(edgeRect.Contains(new Point(120, 1075)));
+        Assert.True(ZoneGeometry.IsInZone(zone, new Point(120, 1079), virtualScreen));
+        Assert.True(ZoneGeometry.IsInZone(zone, new Point(120, 1005), virtualScreen));
+        Assert.False(ZoneGeometry.IsInZone(zone, new Point(120, 900), virtualScreen));
     }
 
     [Fact]
@@ -29,7 +26,6 @@ public sealed class ZoneGeometryTests
     {
         var zone = new ZoneConfig
         {
-            Mode = ZoneMode.HotZone,
             ActiveZone = new RectConfig { X = -200, Y = 40, Width = 300, Height = 80 }
         };
 
@@ -39,19 +35,4 @@ public sealed class ZoneGeometryTests
         Assert.False(ZoneGeometry.IsInZone(zone, new Point(120, 80), virtualScreen));
     }
 
-    [Fact]
-    public void ActiveZone_ShouldDriveDetectionRegardlessOfMode()
-    {
-        var zone = new ZoneConfig
-        {
-            Mode = ZoneMode.EdgeBar,
-            Edge = EdgePosition.Bottom,
-            ActiveZone = new RectConfig { X = 50, Y = 50, Width = 200, Height = 120 }
-        };
-
-        var virtualScreen = new Rectangle(0, 0, 1920, 1080);
-
-        Assert.True(ZoneGeometry.IsInZone(zone, new Point(120, 100), virtualScreen));
-        Assert.False(ZoneGeometry.IsInZone(zone, new Point(120, 500), virtualScreen));
-    }
 }
