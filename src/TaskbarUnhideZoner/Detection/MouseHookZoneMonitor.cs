@@ -14,6 +14,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
     private System.Threading.Timer? _dispatchTimer;
     private bool _running;
     private bool _hasLatest;
+    private bool _hasAnySample;
     private System.Drawing.Point _latestPoint;
     private long _latestElapsedMs;
 
@@ -39,7 +40,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
                 throw new InvalidOperationException($"SetWindowsHookEx failed with error {errorCode}.");
             }
 
-            _dispatchTimer = new System.Threading.Timer(OnDispatchTick, null, 15, 15);
+            _dispatchTimer = new System.Threading.Timer(OnDispatchTick, null, 20, 20);
             _running = true;
         }
     }
@@ -68,6 +69,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
             lock (_latestSync)
             {
                 _hasLatest = false;
+                _hasAnySample = false;
             }
         }
     }
@@ -90,6 +92,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
                     _latestPoint = new System.Drawing.Point(data.Pt.X, data.Pt.Y);
                     _latestElapsedMs = _stopwatch.ElapsedMilliseconds;
                     _hasLatest = true;
+                    _hasAnySample = true;
                 }
             }
         }
@@ -104,13 +107,13 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
 
         lock (_latestSync)
         {
-            if (!_hasLatest)
+            if (!_hasAnySample)
             {
                 return;
             }
 
             point = _latestPoint;
-            elapsedMs = _latestElapsedMs;
+            elapsedMs = _hasLatest ? _latestElapsedMs : _stopwatch.ElapsedMilliseconds;
             _hasLatest = false;
         }
 
