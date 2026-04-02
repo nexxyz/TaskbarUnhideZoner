@@ -31,11 +31,6 @@ internal static class Program
             return UnhideLoopRunner.Run(args);
         }
 
-        if (args.Contains("--spike-explorer-message", StringComparer.OrdinalIgnoreCase))
-        {
-            return RevealMethodSpikeRunner.Run();
-        }
-
         if (!TryAcquireSingleInstance())
         {
             RollingFileLogger.Info("Another instance is already running; exiting.");
