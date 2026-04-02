@@ -43,6 +43,7 @@ Expected configurable fields:
 - Preset mapping (`quickMs`, `defaultMs`, `longMs`)
 - Zone mode (`EdgeBar` or `HotZone`)
 - Edge settings (`edge`, `edgeThicknessPx`, persisted `edgeZone` rectangle)
+- Unified active zone rectangle (`activeZone`) used by runtime hit-testing
 - Hot zone rectangle (`x`, `y`, `width`, `height`) in virtual-screen coordinates
 - Detection backend mode (`MouseHook` default, optional explicit `Polling` for diagnostics)
 - Poll interval (only used if explicit polling backend is selected)
@@ -65,7 +66,7 @@ Optional diagnostic backend:
 
 Shared logic:
 
-- Zone hit-testing
+- Zone hit-testing via one active rectangle path (for both edge and hot-zone)
 - Dwell timing
 - One trigger per entry cycle
 - Cooldown handling

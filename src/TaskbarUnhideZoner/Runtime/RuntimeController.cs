@@ -127,6 +127,13 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         Config.Zone.Mode = ZoneMode.EdgeBar;
         Config.Zone.Edge = edge;
         Config.Zone.EdgeThicknessPx = Math.Clamp(edge is EdgePosition.Top or EdgePosition.Bottom ? rectangle.Height : rectangle.Width, 1, 400);
+        Config.Zone.ActiveZone = new RectConfig
+        {
+            X = rectangle.X,
+            Y = rectangle.Y,
+            Width = rectangle.Width,
+            Height = rectangle.Height
+        };
         Config.Zone.EdgeZone = new RectConfig
         {
             X = rectangle.X,
@@ -140,6 +147,13 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     public void SetHotZone(Rectangle rectangle)
     {
         Config.Zone.Mode = ZoneMode.HotZone;
+        Config.Zone.ActiveZone = new RectConfig
+        {
+            X = rectangle.X,
+            Y = rectangle.Y,
+            Width = rectangle.Width,
+            Height = rectangle.Height
+        };
         Config.Zone.HotZone.X = rectangle.X;
         Config.Zone.HotZone.Y = rectangle.Y;
         Config.Zone.HotZone.Width = rectangle.Width;
