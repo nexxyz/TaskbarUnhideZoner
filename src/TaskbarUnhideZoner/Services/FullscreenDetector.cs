@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using TaskbarUnhideZoner.Interop;
 
 namespace TaskbarUnhideZoner.Services;
@@ -15,6 +16,11 @@ internal static class FullscreenDetector
 
         var shell = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (hwnd == shell)
+        {
+            return false;
+        }
+
+        if (IsDesktopHostWindow(hwnd))
         {
             return false;
         }
@@ -48,5 +54,21 @@ internal static class FullscreenDetector
                             && Math.Abs(fgHeight - monHeight) <= slack;
 
         return coversMonitor;
+    }
+
+    private static bool IsDesktopHostWindow(IntPtr hwnd)
+    {
+        var className = new StringBuilder(256);
+        var len = NativeMethods.GetClassName(hwnd, className, className.Capacity);
+        if (len <= 0)
+        {
+            return false;
+        }
+
+        var name = className.ToString();
+        return string.Equals(name, "Progman", StringComparison.Ordinal)
+               || string.Equals(name, "WorkerW", StringComparison.Ordinal)
+               || string.Equals(name, "Shell_TrayWnd", StringComparison.Ordinal)
+               || string.Equals(name, "Shell_SecondaryTrayWnd", StringComparison.Ordinal);
     }
 }
