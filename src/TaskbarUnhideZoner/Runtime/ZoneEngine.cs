@@ -23,8 +23,6 @@ internal sealed class ZoneEngine : IDisposable
             cooldownMs: () => _config.Trigger.CooldownMs);
     }
 
-    public string ActiveBackendName => _monitor?.Name ?? "none";
-
     public void Start()
     {
         lock (_sync)
@@ -34,7 +32,7 @@ internal sealed class ZoneEngine : IDisposable
                 return;
             }
 
-            _monitor = ZoneMonitorFactory.Create(_config);
+            _monitor = ZoneMonitorFactory.Create();
             _monitor.CursorPositionChanged += OnCursorPositionChanged;
             _monitor.Start();
             _running = true;

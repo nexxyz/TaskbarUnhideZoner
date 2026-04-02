@@ -20,9 +20,9 @@ internal static class HarnessRunner
             LogStep("Set quick preset", () => runtime.SetDelayPreset(DelayPreset.Quick));
             LogStep("Set default preset", () => runtime.SetDelayPreset(DelayPreset.Default));
             LogStep("Set long preset", () => runtime.SetDelayPreset(DelayPreset.Long));
-            LogStep("Set edge top", () => runtime.SetEdgePosition(EdgePosition.Top));
-            LogStep("Set edge bottom", () => runtime.SetEdgePosition(EdgePosition.Bottom));
-            LogStep("Switch to hot zone", () => runtime.SetZoneMode(ZoneMode.HotZone));
+            var virtualScreen = SystemInformation.VirtualScreen;
+            LogStep("Set edge top", () => runtime.SetEdgeZone(EdgePosition.Top, new Rectangle(virtualScreen.Left, virtualScreen.Top, virtualScreen.Width, 120)));
+            LogStep("Set edge bottom", () => runtime.SetEdgeZone(EdgePosition.Bottom, new Rectangle(virtualScreen.Left, virtualScreen.Bottom - 120, virtualScreen.Width, 120)));
             LogStep("Assign hot zone rectangle", () => runtime.SetHotZone(new Rectangle(0, 0, 300, 120)));
             LogStep("Disable monitoring", () => runtime.SetEnabled(false));
             LogStep("Enable monitoring again", () => runtime.SetEnabled(true));

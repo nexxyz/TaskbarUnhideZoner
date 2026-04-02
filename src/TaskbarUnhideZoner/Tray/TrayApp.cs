@@ -20,13 +20,7 @@ internal sealed class TrayApp : ApplicationContext
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
     private ToolStripMenuItem? _zoneMenu;
-    private ToolStripMenuItem? _edgeTopItem;
-    private ToolStripMenuItem? _edgeBottomItem;
-    private ToolStripMenuItem? _edgeLeftItem;
-    private ToolStripMenuItem? _edgeRightItem;
-    private ToolStripMenuItem? _hotZoneItem;
     private ToolStripMenuItem? _autohideInfoItem;
-    private ToolStripMenuItem? _backendInfoItem;
 
     private bool _initializing = true;
 
@@ -133,12 +127,6 @@ internal sealed class TrayApp : ApplicationContext
                 : "Mouse hook monitoring could not start";
         }
 
-        if (_backendInfoItem != null)
-        {
-            _backendInfoItem.Text = $"Backend: {_runtime.ActiveBackend}";
-        }
-
-        UpdateZoneMenuChecks();
     }
 
     private void Exit()
@@ -212,11 +200,6 @@ internal sealed class TrayApp : ApplicationContext
         var openLog = new ToolStripMenuItem("Open Log");
         openLog.Click += (_, _) => OpenFile(Paths.LogFilePath);
 
-        _backendInfoItem = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
-        {
-            Enabled = false
-        };
-
         _autohideInfoItem = new ToolStripMenuItem("Turn on taskbar autohide in Windows settings to use this app")
         {
             Enabled = false,
@@ -232,7 +215,6 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(_zoneMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_autohideInfoItem);
-        menu.Items.Add(_backendInfoItem);
         menu.Items.Add(openConfig);
         menu.Items.Add(openLog);
         menu.Items.Add(new ToolStripSeparator());
@@ -330,28 +312,22 @@ internal sealed class TrayApp : ApplicationContext
     {
         var menu = new ToolStripMenuItem("Zone");
 
-        var edgeMenu = new ToolStripMenuItem("Edge Bar");
-        _edgeTopItem = CreateEdgeItem("Top", EdgePosition.Top);
-        _edgeBottomItem = CreateEdgeItem("Bottom", EdgePosition.Bottom);
-        _edgeLeftItem = CreateEdgeItem("Left", EdgePosition.Left);
-        _edgeRightItem = CreateEdgeItem("Right", EdgePosition.Right);
-        _hotZoneItem = new ToolStripMenuItem("Hot Zone") { CheckOnClick = true };
-        _hotZoneItem.Click += (_, _) => SelectHotZone();
+        menu.DropDownItems.Add(CreateEdgeItem("Select Top Edge...", EdgePosition.Top));
+        menu.DropDownItems.Add(CreateEdgeItem("Select Bottom Edge...", EdgePosition.Bottom));
+        menu.DropDownItems.Add(CreateEdgeItem("Select Left Edge...", EdgePosition.Left));
+        menu.DropDownItems.Add(CreateEdgeItem("Select Right Edge...", EdgePosition.Right));
+        menu.DropDownItems.Add(new ToolStripSeparator());
 
-        edgeMenu.DropDownItems.Add(_edgeTopItem);
-        edgeMenu.DropDownItems.Add(_edgeBottomItem);
-        edgeMenu.DropDownItems.Add(_edgeLeftItem);
-        edgeMenu.DropDownItems.Add(_edgeRightItem);
-        menu.DropDownItems.Add(edgeMenu);
-        menu.DropDownItems.Add(_hotZoneItem);
+        var hotZoneItem = new ToolStripMenuItem("Select Hot Zone...");
+        hotZoneItem.Click += (_, _) => SelectHotZone();
+        menu.DropDownItems.Add(hotZoneItem);
 
-        UpdateZoneMenuChecks();
         return menu;
     }
 
     private ToolStripMenuItem CreateEdgeItem(string label, EdgePosition edge)
     {
-        var item = new ToolStripMenuItem(label) { CheckOnClick = true };
+        var item = new ToolStripMenuItem(label);
         item.Click += (_, _) => SelectEdgeZone(edge);
         return item;
     }
@@ -366,7 +342,6 @@ internal sealed class TrayApp : ApplicationContext
         var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge);
         if (rect == null)
         {
-            UpdateZoneMenuChecks();
             return;
         }
 
@@ -385,7 +360,6 @@ internal sealed class TrayApp : ApplicationContext
         var rect = HotZoneOverlayForm.SelectRectangle();
         if (rect == null)
         {
-            UpdateZoneMenuChecks();
             return;
         }
 
@@ -394,21 +368,10 @@ internal sealed class TrayApp : ApplicationContext
         RefreshUiState();
     }
 
-    private void UpdateZoneMenuChecks()
-    {
-        var isEdge = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar;
-        if (_edgeTopItem != null) _edgeTopItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Top;
-        if (_edgeBottomItem != null) _edgeBottomItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Bottom;
-        if (_edgeLeftItem != null) _edgeLeftItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Left;
-        if (_edgeRightItem != null) _edgeRightItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Right;
-        if (_hotZoneItem != null) _hotZoneItem.Checked = _runtime.Config.Zone.Mode == ZoneMode.HotZone;
-    }
-
     private string BuildTrayText(bool suspendedByAutohide, bool monitorUnavailable)
     {
-        var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
-            ? _runtime.Config.Zone.Edge.ToString()
-            : "Hot Zone";
+        var zone = _runtime.Config.Zone.ActiveZone;
+        var zoneText = $"{zone.Width}x{zone.Height}";
 
         if (suspendedByAutohide)
         {
@@ -421,7 +384,7 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         return _runtime.Config.Enabled
-            ? $"Taskbar Unhide Zoner ({zoneMode})"
+            ? $"Taskbar Unhide Zoner ({zoneText})"
             : "Taskbar Unhide Zoner (Disabled)";
     }
 
