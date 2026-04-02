@@ -18,6 +18,11 @@ internal sealed class TrayApp : ApplicationContext
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
     private ToolStripMenuItem? _zoneMenu;
+    private ToolStripMenuItem? _edgeTopItem;
+    private ToolStripMenuItem? _edgeBottomItem;
+    private ToolStripMenuItem? _edgeLeftItem;
+    private ToolStripMenuItem? _edgeRightItem;
+    private ToolStripMenuItem? _hotZoneItem;
     private ToolStripMenuItem? _autohideInfoItem;
     private ToolStripMenuItem? _backendInfoItem;
 
@@ -99,29 +104,14 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         var suspendedByAutohide = _runtime.IsAutohideOffSuspended;
-        var monitorError = _runtime.MonitoringError;
-        var monitorUnavailable = !string.IsNullOrWhiteSpace(monitorError);
-        var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
-            ? _runtime.Config.Zone.Edge.ToString()
-            : "Hot Zone";
-
-        _notifyIcon.Text = suspendedByAutohide
-            ? "Taskbar Unhide Zoner (Autohide Off)"
-            : monitorUnavailable
-                ? "Taskbar Unhide Zoner (Monitoring Unavailable)"
-            : _runtime.Config.Enabled
-                ? $"Taskbar Unhide Zoner ({zoneMode})"
-                : "Taskbar Unhide Zoner (Disabled)";
-
-        _enabledItem.Enabled = !suspendedByAutohide && !monitorUnavailable;
-        _enabledItem.Checked = _runtime.Config.Enabled && !suspendedByAutohide && !monitorUnavailable;
-        _enabledItem.Text = suspendedByAutohide
-            ? "Disabled - taskbar autohide is off"
-            : monitorUnavailable
-                ? "Disabled - mouse hook monitoring unavailable"
-            : "Enable Taskbar Unhide Zoner";
-
+        var monitorUnavailable = !string.IsNullOrWhiteSpace(_runtime.MonitoringError);
         var interactive = !suspendedByAutohide && !monitorUnavailable;
+
+        _notifyIcon.Text = BuildTrayText(suspendedByAutohide, monitorUnavailable);
+        _enabledItem.Enabled = interactive;
+        _enabledItem.Checked = _runtime.Config.Enabled && interactive;
+        _enabledItem.Text = BuildEnabledItemText(suspendedByAutohide, monitorUnavailable);
+
         if (_delayMenu != null) _delayMenu.Enabled = interactive;
         if (_zoneMenu != null) _zoneMenu.Enabled = interactive;
 
@@ -137,6 +127,8 @@ internal sealed class TrayApp : ApplicationContext
         {
             _backendInfoItem.Text = $"Backend: {_runtime.ActiveBackend}";
         }
+
+        UpdateZoneMenuChecks();
     }
 
     private void Exit()
@@ -305,77 +297,113 @@ internal sealed class TrayApp : ApplicationContext
         var menu = new ToolStripMenuItem("Zone");
 
         var edgeMenu = new ToolStripMenuItem("Edge Bar");
-        var top = new ToolStripMenuItem("Top") { CheckOnClick = true };
-        var bottom = new ToolStripMenuItem("Bottom") { CheckOnClick = true };
-        var left = new ToolStripMenuItem("Left") { CheckOnClick = true };
-        var right = new ToolStripMenuItem("Right") { CheckOnClick = true };
-        var hotZone = new ToolStripMenuItem("Hot Zone") { CheckOnClick = true };
+        _edgeTopItem = CreateEdgeItem("Top", EdgePosition.Top);
+        _edgeBottomItem = CreateEdgeItem("Bottom", EdgePosition.Bottom);
+        _edgeLeftItem = CreateEdgeItem("Left", EdgePosition.Left);
+        _edgeRightItem = CreateEdgeItem("Right", EdgePosition.Right);
+        _hotZoneItem = new ToolStripMenuItem("Hot Zone") { CheckOnClick = true };
+        _hotZoneItem.Click += (_, _) => SelectHotZone();
 
-        void SetEdge(EdgePosition edge)
-        {
-            if (_initializing)
-            {
-                return;
-            }
-
-            var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge);
-            if (rect == null)
-            {
-                UpdateChecks();
-                return;
-            }
-
-            _runtime.SetEdgeZone(edge, rect.Value);
-            _runtime.ReinitializeDetection();
-            UpdateChecks();
-            RefreshUiState();
-        }
-
-        void SetHotZone()
-        {
-            if (_initializing)
-            {
-                return;
-            }
-
-            var rect = HotZoneOverlayForm.SelectRectangle();
-            if (rect == null)
-            {
-                UpdateChecks();
-                return;
-            }
-
-            _runtime.SetHotZone(rect.Value);
-            _runtime.ReinitializeDetection();
-            UpdateChecks();
-            RefreshUiState();
-        }
-
-        void UpdateChecks()
-        {
-            var isEdge = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar;
-            top.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Top;
-            bottom.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Bottom;
-            left.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Left;
-            right.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Right;
-            hotZone.Checked = _runtime.Config.Zone.Mode == ZoneMode.HotZone;
-        }
-
-        top.Click += (_, _) => SetEdge(EdgePosition.Top);
-        bottom.Click += (_, _) => SetEdge(EdgePosition.Bottom);
-        left.Click += (_, _) => SetEdge(EdgePosition.Left);
-        right.Click += (_, _) => SetEdge(EdgePosition.Right);
-        hotZone.Click += (_, _) => SetHotZone();
-
-        edgeMenu.DropDownItems.Add(top);
-        edgeMenu.DropDownItems.Add(bottom);
-        edgeMenu.DropDownItems.Add(left);
-        edgeMenu.DropDownItems.Add(right);
+        edgeMenu.DropDownItems.Add(_edgeTopItem);
+        edgeMenu.DropDownItems.Add(_edgeBottomItem);
+        edgeMenu.DropDownItems.Add(_edgeLeftItem);
+        edgeMenu.DropDownItems.Add(_edgeRightItem);
         menu.DropDownItems.Add(edgeMenu);
-        menu.DropDownItems.Add(hotZone);
+        menu.DropDownItems.Add(_hotZoneItem);
 
-        UpdateChecks();
+        UpdateZoneMenuChecks();
         return menu;
+    }
+
+    private ToolStripMenuItem CreateEdgeItem(string label, EdgePosition edge)
+    {
+        var item = new ToolStripMenuItem(label) { CheckOnClick = true };
+        item.Click += (_, _) => SelectEdgeZone(edge);
+        return item;
+    }
+
+    private void SelectEdgeZone(EdgePosition edge)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge);
+        if (rect == null)
+        {
+            UpdateZoneMenuChecks();
+            return;
+        }
+
+        _runtime.SetEdgeZone(edge, rect.Value);
+        _runtime.ReinitializeDetection();
+        RefreshUiState();
+    }
+
+    private void SelectHotZone()
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        var rect = HotZoneOverlayForm.SelectRectangle();
+        if (rect == null)
+        {
+            UpdateZoneMenuChecks();
+            return;
+        }
+
+        _runtime.SetHotZone(rect.Value);
+        _runtime.ReinitializeDetection();
+        RefreshUiState();
+    }
+
+    private void UpdateZoneMenuChecks()
+    {
+        var isEdge = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar;
+        if (_edgeTopItem != null) _edgeTopItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Top;
+        if (_edgeBottomItem != null) _edgeBottomItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Bottom;
+        if (_edgeLeftItem != null) _edgeLeftItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Left;
+        if (_edgeRightItem != null) _edgeRightItem.Checked = isEdge && _runtime.Config.Zone.Edge == EdgePosition.Right;
+        if (_hotZoneItem != null) _hotZoneItem.Checked = _runtime.Config.Zone.Mode == ZoneMode.HotZone;
+    }
+
+    private string BuildTrayText(bool suspendedByAutohide, bool monitorUnavailable)
+    {
+        var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
+            ? _runtime.Config.Zone.Edge.ToString()
+            : "Hot Zone";
+
+        if (suspendedByAutohide)
+        {
+            return "Taskbar Unhide Zoner (Autohide Off)";
+        }
+
+        if (monitorUnavailable)
+        {
+            return "Taskbar Unhide Zoner (Monitoring Unavailable)";
+        }
+
+        return _runtime.Config.Enabled
+            ? $"Taskbar Unhide Zoner ({zoneMode})"
+            : "Taskbar Unhide Zoner (Disabled)";
+    }
+
+    private static string BuildEnabledItemText(bool suspendedByAutohide, bool monitorUnavailable)
+    {
+        if (suspendedByAutohide)
+        {
+            return "Disabled - taskbar autohide is off";
+        }
+
+        if (monitorUnavailable)
+        {
+            return "Disabled - mouse hook monitoring unavailable";
+        }
+
+        return "Enable Taskbar Unhide Zoner";
     }
 
     private static void OpenFile(string path)
