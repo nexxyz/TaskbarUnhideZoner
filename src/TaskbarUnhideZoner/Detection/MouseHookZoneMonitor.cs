@@ -14,9 +14,9 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
     private System.Threading.Timer? _dispatchTimer;
     private bool _running;
     private bool _hasLatest;
-    private bool _hasAnySample;
     private System.Drawing.Point _latestPoint;
     private long _latestElapsedMs;
+    private long _lastHookEventElapsedMs;
 
     public string Name => "mouse-hook";
 
@@ -69,7 +69,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
             lock (_latestSync)
             {
                 _hasLatest = false;
-                _hasAnySample = false;
+                _lastHookEventElapsedMs = 0;
             }
         }
     }
@@ -92,7 +92,7 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
                     _latestPoint = new System.Drawing.Point(data.Pt.X, data.Pt.Y);
                     _latestElapsedMs = _stopwatch.ElapsedMilliseconds;
                     _hasLatest = true;
-                    _hasAnySample = true;
+                    _lastHookEventElapsedMs = _latestElapsedMs;
                 }
             }
         }
@@ -104,19 +104,38 @@ internal sealed class MouseHookZoneMonitor : IZoneMonitor
     {
         System.Drawing.Point point;
         long elapsedMs;
+        var emit = false;
 
         lock (_latestSync)
         {
-            if (!_hasAnySample)
+            if (_hasLatest)
             {
-                return;
+                point = _latestPoint;
+                elapsedMs = _latestElapsedMs;
+                _hasLatest = false;
+                emit = true;
             }
+            else
+            {
+                var now = _stopwatch.ElapsedMilliseconds;
+                var sinceLastHookEventMs = now - _lastHookEventElapsedMs;
 
-            point = _latestPoint;
-            elapsedMs = _hasLatest ? _latestElapsedMs : _stopwatch.ElapsedMilliseconds;
-            _hasLatest = false;
+                if (sinceLastHookEventMs >= 100 && NativeMethods.GetCursorPos(out var p))
+                {
+                    point = new System.Drawing.Point(p.X, p.Y);
+                    elapsedMs = now;
+                    emit = true;
+                }
+                else
+                {
+                    return;
+                }
+            }
         }
 
-        CursorPositionChanged?.Invoke(this, new CursorPositionEventArgs(point, elapsedMs));
+        if (emit)
+        {
+            CursorPositionChanged?.Invoke(this, new CursorPositionEventArgs(point, elapsedMs));
+        }
     }
 }
