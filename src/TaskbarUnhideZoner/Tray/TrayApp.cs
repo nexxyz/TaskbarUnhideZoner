@@ -17,6 +17,9 @@ internal sealed class TrayApp : ApplicationContext
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
     private ToolStripMenuItem? _zoneMenu;
+    private ToolStripMenuItem? _revealMethodMenu;
+    private ToolStripMenuItem? _revealExplorerItem;
+    private ToolStripMenuItem? _revealAbmItem;
     private ToolStripMenuItem? _autohideInfoItem;
     private ToolStripMenuItem? _backendInfoItem;
 
@@ -102,13 +105,16 @@ internal sealed class TrayApp : ApplicationContext
         var zoneMode = _runtime.Config.Zone.Mode == ZoneMode.EdgeBar
             ? _runtime.Config.Zone.Edge.ToString()
             : "Hot Zone";
+        var revealMethodText = _runtime.CurrentRevealMethod == RevealMethod.ExplorerMessage
+            ? "Explorer Msg"
+            : "ABM";
 
         _notifyIcon.Text = suspendedByAutohide
             ? "Taskbar Unhide Zoner (Autohide Off)"
             : monitorUnavailable
                 ? "Taskbar Unhide Zoner (Monitoring Unavailable)"
             : _runtime.Config.Enabled
-                ? $"Taskbar Unhide Zoner ({zoneMode})"
+                ? $"Taskbar Unhide Zoner ({zoneMode}, {revealMethodText})"
                 : "Taskbar Unhide Zoner (Disabled)";
 
         _enabledItem.Enabled = !suspendedByAutohide && !monitorUnavailable;
@@ -122,6 +128,10 @@ internal sealed class TrayApp : ApplicationContext
         var interactive = !suspendedByAutohide && !monitorUnavailable;
         if (_delayMenu != null) _delayMenu.Enabled = interactive;
         if (_zoneMenu != null) _zoneMenu.Enabled = interactive;
+        if (_revealMethodMenu != null) _revealMethodMenu.Enabled = !monitorUnavailable;
+
+        if (_revealExplorerItem != null) _revealExplorerItem.Checked = _runtime.CurrentRevealMethod == RevealMethod.ExplorerMessage;
+        if (_revealAbmItem != null) _revealAbmItem.Checked = _runtime.CurrentRevealMethod == RevealMethod.AbmStateToggle;
 
         if (_autohideInfoItem != null)
         {
@@ -195,6 +205,7 @@ internal sealed class TrayApp : ApplicationContext
 
         _delayMenu = BuildDelayMenu();
         _zoneMenu = BuildZoneMenu();
+        _revealMethodMenu = BuildRevealMethodMenu();
 
         var openConfig = new ToolStripMenuItem("Open Config");
         openConfig.Click += (_, _) => OpenFile(Paths.ConfigFilePath);
@@ -217,6 +228,7 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(startupItem);
         menu.Items.Add(_delayMenu);
         menu.Items.Add(_zoneMenu);
+        menu.Items.Add(_revealMethodMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_autohideInfoItem);
         menu.Items.Add(_backendInfoItem);
@@ -338,6 +350,48 @@ internal sealed class TrayApp : ApplicationContext
         menu.DropDownItems.Add(hotZone);
 
         UpdateChecks();
+        return menu;
+    }
+
+    private ToolStripMenuItem BuildRevealMethodMenu()
+    {
+        var menu = new ToolStripMenuItem("Reveal Method");
+        _revealExplorerItem = new ToolStripMenuItem("Use Explorer Message (Experimental)") { CheckOnClick = true };
+        _revealAbmItem = new ToolStripMenuItem("Use ABM State Toggle (Reliable)") { CheckOnClick = true };
+        var redetect = new ToolStripMenuItem("Re-detect Best Method...");
+
+        _revealExplorerItem.Click += (_, _) =>
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetRevealMethod(RevealMethod.ExplorerMessage);
+            RefreshUiState();
+        };
+
+        _revealAbmItem.Click += (_, _) =>
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetRevealMethod(RevealMethod.AbmStateToggle);
+            RefreshUiState();
+        };
+
+        redetect.Click += (_, _) =>
+        {
+            _runtime.RedetectRevealMethod();
+            RefreshUiState();
+        };
+
+        menu.DropDownItems.Add(_revealExplorerItem);
+        menu.DropDownItems.Add(_revealAbmItem);
+        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(redetect);
         return menu;
     }
 

@@ -1,4 +1,5 @@
 using TaskbarUnhideZoner.Config;
+using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Models;
 using TaskbarUnhideZoner.Services;
 using TaskbarUnhideZoner.Startup;
@@ -10,6 +11,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private readonly object _sync = new();
     private readonly ZoneEngine _engine;
     private readonly TaskbarStateService _taskbarState;
+    private readonly ExplorerMessageRevealService _explorerReveal;
     private readonly System.Threading.Timer _autohidePollTimer;
     private readonly int _autohidePollMs;
 
@@ -22,9 +24,12 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         Config = config;
         _taskbarState = new TaskbarStateService();
+        _explorerReveal = new ExplorerMessageRevealService();
         _engine = new ZoneEngine(config, this);
         Config.StartWithWindows = StartupManager.IsEnabled();
         _autohidePollMs = Math.Clamp(Config.AutohideStatePollSeconds, 5, 300) * 1000;
+
+        AutoDetectRevealMethodIfNeededLocked();
 
         _baselineAutoHideEnabled = _taskbarState.IsAutoHideEnabled();
         ApplyRuntimeGateLocked();
@@ -37,6 +42,8 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     public AppConfig Config { get; }
 
     public string ActiveBackend => _engine.ActiveBackendName;
+
+    public RevealMethod CurrentRevealMethod => Config.RevealMethod;
 
     public bool IsAutohideOffSuspended
     {
@@ -82,6 +89,37 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         StartupManager.SetEnabled(enabled);
         Config.StartWithWindows = StartupManager.IsEnabled();
         Save();
+    }
+
+    public void SetRevealMethod(RevealMethod method)
+    {
+        lock (_sync)
+        {
+            if (Config.RevealMethod == method)
+            {
+                return;
+            }
+
+            if (_managedVisibleActive)
+            {
+                RestoreBaselineLocked();
+            }
+
+            Config.RevealMethod = method;
+            Save();
+        }
+
+        RaiseStateChanged();
+    }
+
+    public void RedetectRevealMethod()
+    {
+        lock (_sync)
+        {
+            DetectAndApplyRevealMethodLocked(force: true);
+        }
+
+        RaiseStateChanged();
     }
 
     public void SetDelayPreset(DelayPreset preset)
@@ -202,10 +240,21 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
                 return;
             }
 
-            if (_taskbarState.SetAutoHideEnabled(false))
+            switch (Config.RevealMethod)
             {
-                _managedVisibleActive = true;
-                _lastStateWriteUtc = DateTime.UtcNow;
+                case RevealMethod.ExplorerMessage:
+                    _explorerReveal.TryReveal();
+                    break;
+
+                case RevealMethod.AbmStateToggle:
+                default:
+                    if (_taskbarState.SetAutoHideEnabled(false))
+                    {
+                        _managedVisibleActive = true;
+                        _lastStateWriteUtc = DateTime.UtcNow;
+                    }
+
+                    break;
             }
         }
 
@@ -216,7 +265,11 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         lock (_sync)
         {
-            RestoreBaselineLocked();
+            if (Config.RevealMethod == RevealMethod.AbmStateToggle)
+            {
+                RestoreBaselineLocked();
+            }
+
             ApplyRuntimeGateLocked();
         }
 
@@ -280,5 +333,39 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private void RaiseStateChanged()
     {
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AutoDetectRevealMethodIfNeededLocked()
+    {
+        if (Config.RevealMethod != RevealMethod.Unset)
+        {
+            return;
+        }
+
+        DetectAndApplyRevealMethodLocked(force: false);
+    }
+
+    private void DetectAndApplyRevealMethodLocked(bool force)
+    {
+        if (!force && Config.RevealMethod != RevealMethod.Unset)
+        {
+            return;
+        }
+
+        var autohideEnabled = _taskbarState.IsAutoHideEnabled();
+        if (!autohideEnabled)
+        {
+            Config.RevealMethod = RevealMethod.AbmStateToggle;
+            Save();
+            RollingFileLogger.Info("Reveal method detection: autohide off, selected ABM state toggle.");
+            return;
+        }
+
+        var explorerWorks = _explorerReveal.ProbeWorks(_taskbarState);
+        Config.RevealMethod = explorerWorks ? RevealMethod.ExplorerMessage : RevealMethod.AbmStateToggle;
+        Save();
+
+        var chosen = Config.RevealMethod == RevealMethod.ExplorerMessage ? "ExplorerMessage" : "AbmStateToggle";
+        RollingFileLogger.Info($"Reveal method detection complete, selected {chosen}.");
     }
 }

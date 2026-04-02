@@ -20,6 +20,8 @@ internal sealed class AppConfig
 
     public FullscreenConfig Fullscreen { get; set; } = new();
 
+    public RevealMethod RevealMethod { get; set; } = RevealMethod.Unset;
+
     public void Normalize()
     {
         DelayPresets ??= new DelayPresets();
@@ -30,6 +32,11 @@ internal sealed class AppConfig
 
         TriggerDelayMs = Math.Clamp(TriggerDelayMs, 50, 15000);
         AutohideStatePollSeconds = Math.Clamp(AutohideStatePollSeconds, 5, 300);
+        if (!Enum.IsDefined(typeof(RevealMethod), RevealMethod))
+        {
+            RevealMethod = RevealMethod.Unset;
+        }
+
         DelayPresets.Normalize();
         Zone.Normalize();
         Detection.Normalize();
@@ -141,6 +148,13 @@ internal enum DetectionBackend
 internal enum TriggerStrategy
 {
     NoMoveOnly
+}
+
+internal enum RevealMethod
+{
+    Unset,
+    ExplorerMessage,
+    AbmStateToggle
 }
 
 internal enum DelayPreset

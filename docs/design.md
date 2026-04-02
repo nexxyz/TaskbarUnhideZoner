@@ -25,6 +25,10 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
   - Zone mode selection:
     - Edge bar (top, bottom, left, right) with overlay-based thickness selection
     - Hot zone rectangle via drag overlay
+  - Reveal method selection:
+    - Explorer message (experimental)
+    - ABM state toggle (reliable)
+    - Re-detect best method
 - Open config file
 - Exit
 - Settings are persisted and restored on next launch.
@@ -47,6 +51,7 @@ Expected configurable fields:
 - Detection backend mode (`MouseHook` default, optional explicit `Polling` for diagnostics)
 - Poll interval (only used if explicit polling backend is selected)
 - Trigger behavior settings (`cooldownMs`, strategy)
+- Reveal method setting (`revealMethod`)
 - Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
 - Autohide state check interval (`autohideStatePollSeconds`, default 5)
 
@@ -56,7 +61,6 @@ Do not hard-commit to one detection mechanism up front. Implement a pluggable mo
 
 Primary zone-entry backend:
 
-- Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing
 - Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing and low-frequency idle sampling for stable dwell timing
 
 Optional diagnostic backend:
@@ -73,19 +77,28 @@ Shared logic:
 Taskbar reveal strategy:
 
 1. Strict no-move policy: cursor movement/synthetic pointer nudging is not allowed.
-2. Use `SHAppBarMessage` state control (`ABM_GETSTATE` / `ABM_SETSTATE`) for zone-driven show/restore.
-3. On zone enter (after dwell), disable autohide (show taskbar); on zone leave, restore baseline state.
+2. Detect-once method selection on first startup:
+   - If Explorer message probe works, select Explorer message mode.
+   - Otherwise select ABM state-toggle mode.
+3. Allow manual override and manual re-detection from tray menu.
 
 ## No-move and autohide state decisions
 
 - No cursor movement is allowed for taskbar reveal. Any cursor-nudge/synthetic mouse movement approach is out of scope.
-- Primary reveal mechanism is taskbar state management via `SHAppBarMessage` (`ABM_GETSTATE` / `ABM_SETSTATE`).
+- Primary reveal mechanism is selected once at startup and stored in config (`revealMethod`).
+- Candidate methods:
+  - Explorer message mode (undocumented message to `Shell_TrayWnd`, no state mutation)
+  - ABM state-toggle mode via `SHAppBarMessage` (`ABM_GETSTATE` / `ABM_SETSTATE`)
 - Zone behavior:
-  - On dwell-complete zone enter: disable autohide (taskbar shown).
-  - On zone leave: restore prior autohide state.
+  - In Explorer mode, on dwell-complete zone enter send reveal message; on leave no explicit restore action.
+  - In ABM mode, on dwell-complete zone enter disable autohide; on leave restore prior autohide state.
 - If taskbar autohide is already off:
   - Suspend zone monitoring entirely (no mouse hook/polling monitor running).
   - Do not run trigger logic.
+- Method detection policy:
+  - Run automatically on first startup when `revealMethod` is unset.
+  - Use binary outcome (works / does not work), no probabilistic scoring.
+  - If detection cannot be run safely (e.g., autohide currently off), default to ABM mode.
 - Tray UX when autohide is off:
   - Gray out the main enable entry.
   - Show text similar to: `Disabled - taskbar autohide is off`.
@@ -225,7 +238,7 @@ Harness execution contract:
   - `IZoneMonitor` abstraction (mouse-hook primary, polling optional diagnostic mode)
   - zone evaluator and dwell engine
 - `Trigger`
-  - no-move taskbar state strategy and restore logic
+  - no-move reveal methods, detect-once selection, and ABM restore logic
 - `UI`
   - temporary hot-zone selection overlay
 - `Interop`
@@ -243,7 +256,7 @@ Harness execution contract:
 1. Scaffold app shell (single instance, tray icon, context menu, config persistence, startup toggle).
 2. Implement zone model, dwell logic, and mouse-hook backend.
 3. Add optional polling backend for diagnostics only (no silent runtime fallback).
-4. Implement strict no-move taskbar state strategy (`ABM_GETSTATE` / `ABM_SETSTATE`).
+4. Implement strict no-move reveal methods and detect-once selection.
 5. Implement hot-zone draw overlay (`Esc` cancel).
 6. Add unit tests for logic modules.
 7. Add local live-test harness and logging checks.

@@ -12,6 +12,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - Selecting any zone from the menu opens an overlay to define that zone (`Esc` cancels).
 - Supports quick toggles from tray menu (enable/disable, startup, delay preset, zone mode).
 - Uses no cursor hijacking in normal app behavior (no pointer nudging).
+- Auto-detects reveal method on first startup and stores it in config.
 
 ## Requirements
 
@@ -54,6 +55,10 @@ dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj
    - `Zone`:
      - `Top/Bottom/Left/Right` opens an overlay and lets you click thickness for a full-width/full-height edge zone
      - `Hot Zone` opens a freeform rectangle draw overlay
+   - `Reveal Method`:
+     - `Use Explorer Message (Experimental)`
+     - `Use ABM State Toggle (Reliable)`
+     - `Re-detect Best Method...`
 4. Keep `Enable Taskbar Unhide Zoner` checked.
 
 ### Notes about auto-hide
@@ -79,6 +84,7 @@ You can edit this file directly while the app is not running. Main fields:
 - `Trigger` (`CooldownMs`, `Strategy`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)
 - `AutohideStatePollSeconds`
+- `RevealMethod` (`Unset`, `ExplorerMessage`, `AbmStateToggle`)
 
 ## Troubleshooting
 
@@ -86,6 +92,7 @@ You can edit this file directly while the app is not running. Main fields:
   - Verify taskbar auto-hide is enabled in Windows settings.
   - Confirm app tray menu shows enabled state.
   - Try `Quick` delay preset.
+  - Try `Reveal Method -> Re-detect Best Method...`.
 - Hot zone seems wrong:
   - Re-select `Zone -> Hot Zone` to redraw.
   - Check `HotZone` coordinates in config.
