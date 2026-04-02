@@ -8,7 +8,7 @@ internal static class ZoneGeometry
     {
         return config.Mode switch
         {
-            ZoneMode.EdgeBar => IsInEdgeZone(config, cursor, virtualScreen),
+            ZoneMode.EdgeBar => IsInEdgeZone(config, cursor),
             ZoneMode.HotZone => GetHotZone(config).Contains(cursor),
             _ => false
         };
@@ -33,9 +33,17 @@ internal static class ZoneGeometry
         };
     }
 
-    private static bool IsInEdgeZone(ZoneConfig config, Point cursor, Rectangle virtualScreen)
+    private static bool IsInEdgeZone(ZoneConfig config, Point cursor)
     {
-        var edgeRect = GetEdgeRectangle(config, virtualScreen);
-        return edgeRect.Contains(cursor);
+        foreach (var screen in Screen.AllScreens)
+        {
+            var edgeRect = GetEdgeRectangle(config, screen.Bounds);
+            if (edgeRect.Contains(cursor))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

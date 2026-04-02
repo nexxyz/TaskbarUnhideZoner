@@ -16,11 +16,12 @@ public sealed class ZoneGeometryTests
             EdgeThicknessPx = 3
         };
 
-        var virtualScreen = new Rectangle(0, 0, 1920, 1080);
+        var screenBounds = new Rectangle(0, 0, 1920, 1080);
+        var edgeRect = ZoneGeometry.GetEdgeRectangle(zone, screenBounds);
 
-        Assert.True(ZoneGeometry.IsInZone(zone, new Point(120, 1079), virtualScreen));
-        Assert.True(ZoneGeometry.IsInZone(zone, new Point(120, 1078), virtualScreen));
-        Assert.False(ZoneGeometry.IsInZone(zone, new Point(120, 1075), virtualScreen));
+        Assert.True(edgeRect.Contains(new Point(120, 1079)));
+        Assert.True(edgeRect.Contains(new Point(120, 1078)));
+        Assert.False(edgeRect.Contains(new Point(120, 1075)));
     }
 
     [Fact]
