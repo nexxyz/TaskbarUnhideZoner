@@ -56,11 +56,17 @@ internal sealed class ZoneConfig
     public ZoneMode Mode { get; set; } = ZoneMode.EdgeBar;
     public EdgePosition Edge { get; set; } = EdgePosition.Bottom;
     public int EdgeThicknessPx { get; set; } = 2;
+    public RectConfig? EdgeZone { get; set; }
     public RectConfig HotZone { get; set; } = new() { X = 0, Y = 0, Width = 320, Height = 120 };
 
     public void Normalize()
     {
         EdgeThicknessPx = Math.Clamp(EdgeThicknessPx, 1, 100);
+        if (EdgeZone != null)
+        {
+            EdgeZone.Normalize();
+        }
+
         HotZone ??= new RectConfig { X = 0, Y = 0, Width = 320, Height = 120 };
         HotZone.Normalize();
     }
