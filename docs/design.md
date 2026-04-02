@@ -42,7 +42,7 @@ Expected configurable fields:
 - `triggerDelayMs`
 - Preset mapping (`quickMs`, `defaultMs`, `longMs`)
 - Zone mode (`EdgeBar` or `HotZone`)
-- Edge settings (`edge`, `edgeThicknessPx`)
+- Edge settings (`edge`, `edgeThicknessPx`, persisted `edgeZone` rectangle)
 - Hot zone rectangle (`x`, `y`, `width`, `height`) in virtual-screen coordinates
 - Detection backend mode (`MouseHook` default, optional explicit `Polling` for diagnostics)
 - Poll interval (only used if explicit polling backend is selected)
@@ -57,6 +57,7 @@ Do not hard-commit to one detection mechanism up front. Implement a pluggable mo
 Primary zone-entry backend:
 
 - Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing
+- Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing and low-frequency idle sampling for stable dwell timing
 
 Optional diagnostic backend:
 
