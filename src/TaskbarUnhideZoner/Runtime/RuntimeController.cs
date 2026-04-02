@@ -108,14 +108,32 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void SetEdgePosition(EdgePosition edge)
     {
-        SetEdgeZone(edge, Config.Zone.EdgeThicknessPx);
+        var virtualScreen = SystemInformation.VirtualScreen;
+        var thickness = Math.Clamp(Config.Zone.EdgeThicknessPx, 1, 400);
+        var rectangle = edge switch
+        {
+            EdgePosition.Top => new Rectangle(virtualScreen.Left, virtualScreen.Top, virtualScreen.Width, thickness),
+            EdgePosition.Bottom => new Rectangle(virtualScreen.Left, virtualScreen.Bottom - thickness, virtualScreen.Width, thickness),
+            EdgePosition.Left => new Rectangle(virtualScreen.Left, virtualScreen.Top, thickness, virtualScreen.Height),
+            EdgePosition.Right => new Rectangle(virtualScreen.Right - thickness, virtualScreen.Top, thickness, virtualScreen.Height),
+            _ => Rectangle.Empty
+        };
+
+        SetEdgeZone(edge, rectangle);
     }
 
-    public void SetEdgeZone(EdgePosition edge, int thicknessPx)
+    public void SetEdgeZone(EdgePosition edge, Rectangle rectangle)
     {
         Config.Zone.Mode = ZoneMode.EdgeBar;
         Config.Zone.Edge = edge;
-        Config.Zone.EdgeThicknessPx = Math.Clamp(thicknessPx, 1, 400);
+        Config.Zone.EdgeThicknessPx = Math.Clamp(edge is EdgePosition.Top or EdgePosition.Bottom ? rectangle.Height : rectangle.Width, 1, 400);
+        Config.Zone.EdgeZone = new RectConfig
+        {
+            X = rectangle.X,
+            Y = rectangle.Y,
+            Width = rectangle.Width,
+            Height = rectangle.Height
+        };
         Save();
     }
 

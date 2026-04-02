@@ -288,11 +288,7 @@ internal sealed class TrayApp : ApplicationContext
                 return;
             }
 
-            var thickness = edge is EdgePosition.Top or EdgePosition.Bottom
-                ? rect.Value.Height
-                : rect.Value.Width;
-
-            _runtime.SetEdgeZone(edge, thickness);
+            _runtime.SetEdgeZone(edge, rect.Value);
             _runtime.ReinitializeDetection();
             UpdateChecks();
             RefreshUiState();

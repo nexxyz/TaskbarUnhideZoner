@@ -35,6 +35,12 @@ internal static class ZoneGeometry
 
     private static bool IsInEdgeZone(ZoneConfig config, Point cursor)
     {
+        if (config.EdgeZone is { Width: > 0, Height: > 0 })
+        {
+            var persisted = new Rectangle(config.EdgeZone.X, config.EdgeZone.Y, config.EdgeZone.Width, config.EdgeZone.Height);
+            return persisted.Contains(cursor);
+        }
+
         foreach (var screen in Screen.AllScreens)
         {
             var edgeRect = GetEdgeRectangle(config, screen.Bounds);
