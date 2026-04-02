@@ -1,6 +1,7 @@
 #define AppName "Taskbar Unhide Zoner"
-#define AppVersion "0.1.0"
+#define AppVersion "0.9"
 #define AppExeName "TaskbarUnhideZoner.exe"
+#define ArchFlag "x64compatible"
 
 [Setup]
 AppId={{A8AF7F8B-1A77-4C75-8B58-5DF6A9234022}
@@ -14,6 +15,7 @@ OutputBaseFilename=TaskbarUnhideZoner-Setup
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=lowest
+ArchitecturesInstallIn64BitMode={#ArchFlag}
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExeName}
 

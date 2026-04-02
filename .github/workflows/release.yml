@@ -1,0 +1,53 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Installer Architecture Flag
+        run: |
+          $content = Get-Content installer/TaskbarUnhideZoner.iss -Raw
+          if ($content -notmatch 'ArchitecturesInstallIn64BitMode=\{#ArchFlag\}') {
+            Write-Error "Installer must use preprocessor ArchFlag."
+            exit 1
+          }
+          if ($content -notmatch '#define ArchFlag "x64compatible"') {
+            Write-Error "ArchFlag must be set to x64compatible."
+            exit 1
+          }
+        shell: powershell
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - run: dotnet restore TaskbarUnhideZoner.slnx
+      - run: dotnet build TaskbarUnhideZoner.slnx --configuration Release --no-restore
+      - run: dotnet test TaskbarUnhideZoner.slnx --configuration Release --no-build
+      - run: dotnet publish src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -c Release -r win-x64 --self-contained false
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Compile Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\TaskbarUnhideZoner.iss
+        shell: powershell
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/TaskbarUnhideZoner-Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
