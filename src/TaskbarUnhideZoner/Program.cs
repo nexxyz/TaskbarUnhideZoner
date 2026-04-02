@@ -34,6 +34,11 @@ internal static class Program
         if (!TryAcquireSingleInstance())
         {
             RollingFileLogger.Info("Another instance is already running; exiting.");
+            MessageBox.Show(
+                "Taskbar Unhide Zoner is already running in the notification area.",
+                "Taskbar Unhide Zoner",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             return 1;
         }
 

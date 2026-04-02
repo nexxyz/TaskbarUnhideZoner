@@ -18,6 +18,7 @@ PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode={#ArchFlag}
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile=..\assets\TaskbarUnhideZoner.ico
 
 [Tasks]
 Name: "startup"; Description: "Start {#AppName} with Windows"; GroupDescription: "Additional options:"; Flags: unchecked
@@ -26,7 +27,7 @@ Name: "startup"; Description: "Start {#AppName} with Windows"; GroupDescription:
 Source: "..\src\TaskbarUnhideZoner\bin\Release\net8.0-windows\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppExeName}"
 Name: "{autoprograms}\{#AppName} (Uninstall)"; Filename: "{uninstallexe}"
 
 [Registry]

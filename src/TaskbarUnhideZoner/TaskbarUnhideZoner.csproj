@@ -7,9 +7,11 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>TaskbarUnhideZoner</RootNamespace>
+    <ApplicationIcon>..\..\assets\TaskbarUnhideZoner.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="..\..\assets\TaskbarUnhideZoner.ico" Link="assets\TaskbarUnhideZoner.ico" />
     <None Include="..\..\assets\Taskbar Unhide Zoner.png" Link="assets\Taskbar Unhide Zoner.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
