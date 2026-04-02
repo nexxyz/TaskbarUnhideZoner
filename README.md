@@ -7,6 +7,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 ## What it does
 
 - Runs in the Windows notification area (tray), no main window.
+- Left-click and right-click tray interactions use the same context-menu behavior.
 - Reveals the taskbar when your cursor enters a configured zone and stays there for a dwell time.
 - Supports edge zones (top/bottom/left/right) and a custom hot-zone rectangle.
 - Selecting any zone from the menu opens an overlay to define that zone (`Esc` cancels).

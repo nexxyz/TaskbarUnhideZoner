@@ -13,6 +13,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly RuntimeController _runtime;
     private readonly NotifyIcon _notifyIcon;
     private readonly SynchronizationContext? _uiContext;
+    private readonly Form _menuAnchor;
 
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
@@ -26,6 +27,7 @@ internal sealed class TrayApp : ApplicationContext
     {
         _runtime = runtime;
         _uiContext = SynchronizationContext.Current;
+        _menuAnchor = CreateMenuAnchor();
         _notifyIcon = new NotifyIcon
         {
             Icon = LoadTrayIcon(),
@@ -44,7 +46,7 @@ internal sealed class TrayApp : ApplicationContext
             }
 
             _runtime.RefreshAutohideState();
-            _notifyIcon.ContextMenuStrip?.Show(Cursor.Position);
+            ShowTrayMenuAtCursor();
         };
 
         _initializing = false;
@@ -143,6 +145,7 @@ internal sealed class TrayApp : ApplicationContext
 
         try
         {
+            _menuAnchor.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
         }
@@ -156,6 +159,10 @@ internal sealed class TrayApp : ApplicationContext
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
+        menu.Closed += (_, _) =>
+        {
+            PostMessage(_menuAnchor.Handle, WmNull, IntPtr.Zero, IntPtr.Zero);
+        };
         menu.Opening += (_, _) =>
         {
             _runtime.RefreshAutohideState();
@@ -225,6 +232,36 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(exitItem);
 
         return menu;
+    }
+
+    private void ShowTrayMenuAtCursor()
+    {
+        var menu = _notifyIcon.ContextMenuStrip;
+        if (menu == null)
+        {
+            return;
+        }
+
+        SetForegroundWindow(_menuAnchor.Handle);
+        menu.Show(Cursor.Position);
+    }
+
+    private static Form CreateMenuAnchor()
+    {
+        var form = new Form
+        {
+            ShowInTaskbar = false,
+            Opacity = 0,
+            FormBorderStyle = FormBorderStyle.None,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(-32000, -32000),
+            Size = new Size(1, 1)
+        };
+
+        form.Load += (_, _) => form.Hide();
+        form.Show();
+        form.Hide();
+        return form;
     }
 
     private ToolStripMenuItem BuildDelayMenu()
@@ -364,4 +401,12 @@ internal sealed class TrayApp : ApplicationContext
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    private const uint WmNull = 0x0000;
 }
