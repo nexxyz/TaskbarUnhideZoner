@@ -11,6 +11,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - Reveals the taskbar when your cursor enters a configured zone and stays there for a dwell time.
 - Supports edge zones (top/bottom/left/right) and a custom hot-zone rectangle.
 - Selecting any zone from the menu opens an overlay to define that zone (`Esc` cancels).
+- At runtime, both edge and hot-zone are detected as a single persisted rectangle (same detection path, different capture UX).
 - Supports quick toggles from tray menu (enable/disable, startup, delay preset, zone mode).
 - Uses no cursor hijacking in normal app behavior (no pointer nudging).
 
@@ -75,7 +76,7 @@ You can edit this file directly while the app is not running. Main fields:
 - `StartWithWindows`
 - `TriggerDelayMs`
 - `DelayPresets` (`QuickMs`, `DefaultMs`, `LongMs`)
-- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `EdgeZone`, `HotZone`)
+- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `ActiveZone`, `EdgeZone`, `HotZone`)
 - `Detection` (`Backend`, `PollIntervalMs`)
 - `Trigger` (`CooldownMs`, `Strategy`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)

@@ -6,12 +6,7 @@ internal static class ZoneGeometry
 {
     public static bool IsInZone(ZoneConfig config, Point cursor, Rectangle virtualScreen)
     {
-        return config.Mode switch
-        {
-            ZoneMode.EdgeBar => IsInEdgeZone(config, cursor),
-            ZoneMode.HotZone => GetHotZone(config).Contains(cursor),
-            _ => false
-        };
+        return GetActiveZoneRectangle(config, virtualScreen).Contains(cursor);
     }
 
     public static Rectangle GetHotZone(ZoneConfig config)
@@ -33,23 +28,33 @@ internal static class ZoneGeometry
         };
     }
 
-    private static bool IsInEdgeZone(ZoneConfig config, Point cursor)
+    public static Rectangle GetActiveZoneRectangle(ZoneConfig config, Rectangle virtualScreen)
     {
+        if (config.ActiveZone is { Width: > 0, Height: > 0 })
+        {
+            return new Rectangle(config.ActiveZone.X, config.ActiveZone.Y, config.ActiveZone.Width, config.ActiveZone.Height);
+        }
+
         if (config.EdgeZone is { Width: > 0, Height: > 0 })
         {
-            var persisted = new Rectangle(config.EdgeZone.X, config.EdgeZone.Y, config.EdgeZone.Width, config.EdgeZone.Height);
-            return persisted.Contains(cursor);
+            return new Rectangle(config.EdgeZone.X, config.EdgeZone.Y, config.EdgeZone.Width, config.EdgeZone.Height);
+        }
+
+        if (config.Mode == ZoneMode.HotZone)
+        {
+            return GetHotZone(config);
+        }
+
+        if (virtualScreen != Rectangle.Empty)
+        {
+            return GetEdgeRectangle(config, virtualScreen);
         }
 
         foreach (var screen in Screen.AllScreens)
         {
-            var edgeRect = GetEdgeRectangle(config, screen.Bounds);
-            if (edgeRect.Contains(cursor))
-            {
-                return true;
-            }
+            return GetEdgeRectangle(config, screen.Bounds);
         }
 
-        return false;
+        return Rectangle.Empty;
     }
 }
