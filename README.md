@@ -1,6 +1,6 @@
 # Taskbar Unhide Zoner
 
-> Under construction: this tool is already usable, but behavior and UX are still being refined.
+> Under construction: usable today, still being refined.
 
 Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep taskbar auto-hide on (for cleaner desktop and reduced OLED burn-in risk), while making taskbar reveal intentional through a configurable sensitivity zone.
 
@@ -19,33 +19,14 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 
 - Windows 10 or Windows 11
 - Taskbar auto-hide enabled (required for runtime behavior)
-- .NET 8 Desktop Runtime (if using framework-dependent build)
+- .NET 8 Desktop Runtime (installer includes a framework-dependent app)
 
-## Install and run
+## Install
 
-### Option A: Installer (recommended)
-
-1. Build publish output:
-
-```powershell
-dotnet publish src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -c Release -r win-x64 --self-contained false
-```
-
-2. Build installer with Inno Setup:
-
-```powershell
-iscc installer/TaskbarUnhideZoner.iss
-```
-
-3. Run generated installer:
-
-- `installer/TaskbarUnhideZoner-Setup.exe`
-
-### Option B: Run from source
-
-```powershell
-dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj
-```
+1. Download the latest installer from Releases:
+   - `https://github.com/nexxyz/TaskbarUnhideZoner/releases/latest`
+2. Run `TaskbarUnhideZoner-Setup.exe`.
+3. Start the app (installer can launch it directly).
 
 ## How to use
 
@@ -64,6 +45,10 @@ dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj
 - In that state, the enable item is grayed out and shows a message indicating auto-hide is off.
 - Re-enable auto-hide in Windows settings, then reopen tray menu or wait for periodic refresh.
 
+### Already running behavior
+
+- If you launch the app again while it is already running, the existing tray instance shows a notification.
+
 ## Configuration file
 
 Config path:
@@ -76,7 +61,7 @@ You can edit this file directly while the app is not running. Main fields:
 - `StartWithWindows`
 - `TriggerDelayMs`
 - `DelayPresets` (`QuickMs`, `DefaultMs`, `LongMs`)
-- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `ActiveZone`, `EdgeZone`, `HotZone`)
+- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `ActiveZone`, `HotZone`)
 - `Detection` (`Backend`, `PollIntervalMs`)
 - `Trigger` (`CooldownMs`, `Strategy`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)
@@ -100,28 +85,6 @@ Logs:
 
 - `%LocalAppData%\TaskbarUnhideZoner\taskbar-unhide-zoner.log`
 
-## Developer commands
+## Technical notes
 
-Build:
-
-```powershell
-dotnet build TaskbarUnhideZoner.slnx
-```
-
-Tests:
-
-```powershell
-dotnet test TaskbarUnhideZoner.slnx
-```
-
-Harness (basic crash/regression sequence):
-
-```powershell
-dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --harness
-```
-
-No-move unhide loop probe:
-
-```powershell
-dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --test-unhide-loop --interval-ms 5000 --duration-sec 60
-```
+- Build/release and developer workflows are documented in `docs/TECHNICAL.md`.
