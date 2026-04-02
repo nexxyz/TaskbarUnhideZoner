@@ -24,9 +24,8 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 ## Install
 
 1. Download the latest installer from Releases:
-   - `https://github.com/nexxyz/TaskbarUnhideZoner/releases/latest`
-2. Run `TaskbarUnhideZoner-Setup.exe`.
-3. Start the app (installer can launch it directly).
+   - [Latest release](https://github.com/nexxyz/TaskbarUnhideZoner/releases/latest)
+2. Run `TaskbarUnhideZoner-Setup.exe` and launch the app when setup completes.
 
 ## How to use
 
