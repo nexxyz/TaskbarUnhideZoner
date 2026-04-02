@@ -14,6 +14,8 @@ internal sealed class TrayApp : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly SynchronizationContext? _uiContext;
     private readonly Form _menuAnchor;
+    private readonly EventWaitHandle _alreadyRunningEvent;
+    private readonly RegisteredWaitHandle _alreadyRunningWait;
 
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
@@ -28,9 +30,10 @@ internal sealed class TrayApp : ApplicationContext
 
     private bool _initializing = true;
 
-    public TrayApp(RuntimeController runtime)
+    public TrayApp(RuntimeController runtime, EventWaitHandle alreadyRunningEvent)
     {
         _runtime = runtime;
+        _alreadyRunningEvent = alreadyRunningEvent;
         _uiContext = SynchronizationContext.Current;
         _menuAnchor = CreateMenuAnchor();
         _notifyIcon = new NotifyIcon
@@ -40,6 +43,13 @@ internal sealed class TrayApp : ApplicationContext
             Text = "Taskbar Unhide Zoner",
             ContextMenuStrip = BuildMenu()
         };
+
+        _alreadyRunningWait = ThreadPool.RegisterWaitForSingleObject(
+            _alreadyRunningEvent,
+            (_, _) => OnAlreadyRunningSignal(),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
 
         _runtime.StateChanged += OnRuntimeStateChanged;
 
@@ -137,6 +147,7 @@ internal sealed class TrayApp : ApplicationContext
 
         try
         {
+            _alreadyRunningWait.Unregister(null);
             _menuAnchor.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
@@ -224,6 +235,25 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(exitItem);
 
         return menu;
+    }
+
+    private void OnAlreadyRunningSignal()
+    {
+        if (_uiContext == null)
+        {
+            ShowAlreadyRunningNotification();
+            return;
+        }
+
+        _uiContext.Post(_ => ShowAlreadyRunningNotification(), null);
+    }
+
+    private void ShowAlreadyRunningNotification()
+    {
+        _notifyIcon.BalloonTipTitle = "Taskbar Unhide Zoner";
+        _notifyIcon.BalloonTipText = "Taskbar Unhide Zoner is already running in the notification area.";
+        _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(2500);
     }
 
     private void ShowTrayMenuAtCursor()
