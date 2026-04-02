@@ -5,3 +5,4 @@ obj/
 *.suo
 TestResults/
 installer/*.exe
+_logs/
