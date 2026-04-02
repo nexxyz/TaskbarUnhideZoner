@@ -25,12 +25,12 @@ public sealed class ZoneGeometryTests
     }
 
     [Fact]
-    public void HotZone_ShouldUseExactRectangle()
+    public void ActiveZone_ShouldUseExactRectangle()
     {
         var zone = new ZoneConfig
         {
             Mode = ZoneMode.HotZone,
-            HotZone = new RectConfig { X = -200, Y = 40, Width = 300, Height = 80 }
+            ActiveZone = new RectConfig { X = -200, Y = 40, Width = 300, Height = 80 }
         };
 
         var virtualScreen = new Rectangle(-1920, 0, 3840, 1080);

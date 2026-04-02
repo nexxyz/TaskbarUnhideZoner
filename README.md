@@ -60,11 +60,16 @@ You can edit this file directly while the app is not running. Main fields:
 - `StartWithWindows`
 - `TriggerDelayMs`
 - `DelayPresets` (`QuickMs`, `DefaultMs`, `LongMs`)
-- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `ActiveZone`, `HotZone`)
+- `Zone` (`Mode`, `Edge`, `EdgeThicknessPx`, `ActiveZone`)
 - `Detection` (`Backend`, `PollIntervalMs`)
 - `Trigger` (`CooldownMs`, `Strategy`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)
 - `AutohideStatePollSeconds`
+
+Notes:
+
+- Detection backend `0` = `MouseHook` (default), `1` = `Polling` (diagnostic mode).
+- `PollIntervalMs` is only used when backend is `Polling`.
 
 ## Troubleshooting
 

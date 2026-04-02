@@ -9,11 +9,6 @@ internal static class ZoneGeometry
         return GetActiveZoneRectangle(config, virtualScreen).Contains(cursor);
     }
 
-    public static Rectangle GetHotZone(ZoneConfig config)
-    {
-        return new Rectangle(config.HotZone.X, config.HotZone.Y, config.HotZone.Width, config.HotZone.Height);
-    }
-
     public static Rectangle GetEdgeRectangle(ZoneConfig config, Rectangle virtualScreen)
     {
         var thickness = Math.Clamp(config.EdgeThicknessPx, 1, 100);
@@ -33,16 +28,6 @@ internal static class ZoneGeometry
         if (config.ActiveZone is { Width: > 0, Height: > 0 })
         {
             return new Rectangle(config.ActiveZone.X, config.ActiveZone.Y, config.ActiveZone.Width, config.ActiveZone.Height);
-        }
-
-        if (config.EdgeZone is { Width: > 0, Height: > 0 })
-        {
-            return new Rectangle(config.EdgeZone.X, config.EdgeZone.Y, config.EdgeZone.Width, config.EdgeZone.Height);
-        }
-
-        if (config.Mode == ZoneMode.HotZone)
-        {
-            return GetHotZone(config);
         }
 
         if (virtualScreen != Rectangle.Empty)

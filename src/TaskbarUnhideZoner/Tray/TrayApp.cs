@@ -209,6 +209,9 @@ internal sealed class TrayApp : ApplicationContext
         var openConfig = new ToolStripMenuItem("Open Config");
         openConfig.Click += (_, _) => OpenFile(Paths.ConfigFilePath);
 
+        var openLog = new ToolStripMenuItem("Open Log");
+        openLog.Click += (_, _) => OpenFile(Paths.LogFilePath);
+
         _backendInfoItem = new ToolStripMenuItem($"Backend: {_runtime.ActiveBackend}")
         {
             Enabled = false
@@ -231,6 +234,7 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(_autohideInfoItem);
         menu.Items.Add(_backendInfoItem);
         menu.Items.Add(openConfig);
+        menu.Items.Add(openLog);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(exitItem);
 

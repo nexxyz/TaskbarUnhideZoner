@@ -28,6 +28,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
         _baselineAutoHideEnabled = _taskbarState.IsAutoHideEnabled();
         ApplyRuntimeGateLocked();
+        Save();
 
         _autohidePollTimer = new System.Threading.Timer(_ => RefreshAutohideState(), null, _autohidePollMs, _autohidePollMs);
     }
@@ -134,13 +135,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             Width = rectangle.Width,
             Height = rectangle.Height
         };
-        Config.Zone.EdgeZone = new RectConfig
-        {
-            X = rectangle.X,
-            Y = rectangle.Y,
-            Width = rectangle.Width,
-            Height = rectangle.Height
-        };
         Save();
     }
 
@@ -154,10 +148,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             Width = rectangle.Width,
             Height = rectangle.Height
         };
-        Config.Zone.HotZone.X = rectangle.X;
-        Config.Zone.HotZone.Y = rectangle.Y;
-        Config.Zone.HotZone.Width = rectangle.Width;
-        Config.Zone.HotZone.Height = rectangle.Height;
         Save();
     }
 
