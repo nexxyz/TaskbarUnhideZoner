@@ -6,3 +6,5 @@ obj/
 TestResults/
 installer/*.exe
 _logs/
+__pycache__/
+*.pyc
