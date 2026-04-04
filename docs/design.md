@@ -1,4 +1,4 @@
-# Taskbar Unhide Zoner - Design Documentation (v1.2)
+# Taskbar Unhide Zoner - Design Documentation (v1.3)
 
 ## Repository scope and locations
 
@@ -22,8 +22,9 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
   - Enable/Disable monitoring
   - Start with Windows toggle
   - Trigger delay presets: Quick / Default / Long
-  - Zone mode selection:
-    - Edge bar (top, bottom, left, right) with overlay-based thickness selection
+  - Trigger Assist presets: Off / Low / Medium / Strong
+  - Zone selection:
+    - Edge region (top, bottom, left, right) with overlay-based thickness selection
     - Hot zone rectangle via drag overlay
 - Open config file
 - Exit
@@ -35,34 +36,33 @@ Primary use case: keep taskbar auto-hide enabled to reduce OLED burn-in risk whi
 
 Use a human-editable JSON config file with safe defaults. The menu changes update this file; users can also edit exact values manually.
 
-Expected configurable fields:
+Current configurable fields:
 
 - `enabled`
 - `startWithWindows`
 - `triggerDelayMs`
 - Preset mapping (`quickMs`, `defaultMs`, `longMs`)
-- Zone mode (`EdgeBar` or `HotZone`)
-- Edge settings (`edge`, `edgeThicknessPx`, persisted `edgeZone` rectangle)
-- Unified active zone rectangle (`activeZone`) used by runtime hit-testing
-- Hot zone rectangle (`x`, `y`, `width`, `height`) in virtual-screen coordinates
-- Detection backend mode (`MouseHook` default, optional explicit `Polling` for diagnostics)
-- Poll interval (only used if explicit polling backend is selected)
-- Trigger behavior settings (`cooldownMs`, strategy)
+- Zone mode (`Zone.Mode`: Top/Bottom/Left/Right/HotZone)
+- Unified active zone rectangle (`Zone.ActiveZone`) used by runtime hit-testing
+- Trigger behavior settings (`Trigger.CooldownMs`, `Trigger.Assist`)
+- Trigger Assist tuning (`Trigger.Assist.Enabled`, `MinDelayPercent`, `CurveExponent`)
 - Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
 - Autohide state check interval (`autohideStatePollSeconds`, default 5)
 
+### Preset menu policy
+
+- Preset menus must represent manual config edits accurately.
+- Preset entries are checked only on exact value match.
+- If values do not match any preset, a read-only `Custom (from config)` entry is shown as checked.
+- Selecting a preset overwrites manual/custom values with that preset values.
+
 ## Detection and trigger strategy
 
-Do not hard-commit to one detection mechanism up front. Implement a pluggable monitor abstraction and choose defaults after practical validation.
+Detection backend policy is now fixed to low-level mouse hook for production behavior.
 
-Primary zone-entry backend:
+Current zone-entry backend:
 
-- Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing
 - Event-driven low-level mouse hook (`WH_MOUSE_LL`) with asynchronous/coalesced processing and low-frequency idle sampling for stable dwell timing
-
-Optional diagnostic backend:
-
-- Cursor position polling (`GetCursorPos` + timer)
 
 Shared logic:
 
@@ -85,7 +85,7 @@ Taskbar reveal strategy:
   - On dwell-complete zone enter: disable autohide (taskbar shown).
   - On zone leave: restore prior autohide state.
 - If taskbar autohide is already off:
-  - Suspend zone monitoring entirely (no mouse hook/polling monitor running).
+  - Suspend zone monitoring entirely (monitor pipeline is not running).
   - Do not run trigger logic.
 - Tray UX when autohide is off:
   - Gray out the main enable entry.
@@ -192,7 +192,7 @@ The following scenarios define the baseline verification matrix. Each item shoul
 - Hot-zone draw flow commits rectangle on mouse release and cancels on `Esc` (`Manual`).
 - Enable/disable from tray applies immediately and persists across restart (`Manual` + `Harness`).
 - Start-with-Windows toggle writes/removes HKCU Run value correctly (`Manual` + `Harness`).
-- Switching zone mode (EdgeBar <-> HotZone) updates runtime behavior without app restart (`Manual` + `Harness`).
+- Switching zone type (edge <-> hot zone) updates runtime behavior without app restart (`Manual` + `Harness`).
 - Taskbar located on non-primary monitor still reveals from configured zone (`Manual`).
 - Mixed monitor layout with negative virtual coordinates still matches configured hot zone (`Manual`).
 - Explorer restart (`explorer.exe`) does not leave app in a crash loop; tray behavior recovers or exits gracefully (`Manual`).
@@ -223,7 +223,7 @@ Harness execution contract:
 - `Startup`
   - HKCU Run key integration
 - `Detection`
-  - `IZoneMonitor` abstraction (mouse-hook primary, polling optional diagnostic mode)
+  - `IZoneMonitor` abstraction (mouse-hook implementation)
   - zone evaluator and dwell engine
 - `Trigger`
   - no-move taskbar state strategy and restore logic
@@ -243,7 +243,7 @@ Harness execution contract:
 
 1. Scaffold app shell (single instance, tray icon, context menu, config persistence, startup toggle).
 2. Implement zone model, dwell logic, and mouse-hook backend.
-3. Add optional polling backend for diagnostics only (no silent runtime fallback).
+3. Keep mouse-hook monitor as the single runtime backend.
 4. Implement strict no-move taskbar state strategy (`ABM_GETSTATE` / `ABM_SETSTATE`).
 5. Implement hot-zone draw overlay (`Esc` cancel).
 6. Add unit tests for logic modules.

@@ -12,7 +12,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - Supports edge zones (top/bottom/left/right) and a custom hot-zone rectangle.
 - Selecting any zone from the menu opens an overlay to define that zone (`Esc` cancels).
 - At runtime, both edge and hot-zone are detected as a single persisted rectangle (same detection path, different capture UX).
-- Supports quick toggles from tray menu (enable/disable, startup, delay preset, zone mode).
+- Supports quick toggles from tray menu (enable/disable, startup, delay preset, trigger assist, zone selection).
 - Uses no cursor hijacking in normal app behavior (no pointer nudging).
 
 ## Requirements
@@ -32,10 +32,11 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 1. Launch app and find its tray icon.
 2. Left-click or right-click the icon to open the menu.
 3. Configure:
-   - `Trigger Delay` (`Quick`, `Default`, `Long`)
-   - `Zone`:
-     - `Top/Bottom/Left/Right` opens an overlay and lets you click thickness for a full-width/full-height edge zone
-     - `Hot Zone` opens a freeform rectangle draw overlay
+   - `Trigger Delay` (`Quick`, `Default`, `Long`; shows `Custom (from config)` for non-preset values)
+   - `Trigger Assist` (`Off`, `Low`, `Medium`, `Strong`; shows `Custom (from config)` for non-preset values)
+   - `Select zone`:
+      - `Top/Bottom/Left/Right` opens an overlay and lets you click thickness for a full-width/full-height edge zone
+      - `Hot Zone` opens a freeform rectangle draw overlay
 4. Keep `Enable Taskbar Unhide Zoner` checked.
 
 ### Notes about auto-hide
@@ -60,8 +61,9 @@ You can edit this file directly while the app is not running. Main fields:
 - `StartWithWindows`
 - `TriggerDelayMs`
 - `DelayPresets` (`QuickMs`, `DefaultMs`, `LongMs`)
-- `Zone` (`ActiveZone`)
-- `Trigger` (`CooldownMs`)
+- `Zone` (`Mode`, `ActiveZone`)
+- `Trigger` (`CooldownMs`, `Assist`)
+- `Trigger.Assist` (`Enabled`, `MinDelayPercent`, `CurveExponent`)
 - `Fullscreen` (`SuspendWhenFullscreenAppActive`)
 - `AutohideStatePollSeconds`
 
@@ -72,10 +74,13 @@ You can edit this file directly while the app is not running. Main fields:
   - Confirm app tray menu shows enabled state.
   - Try `Quick` delay preset.
 - Hot zone seems wrong:
-  - Re-select `Zone -> Hot Zone` to redraw.
-  - Check `HotZone` coordinates in config.
+  - Re-select `Select zone -> Select Hot Zone...` to redraw.
+  - Check `Zone.ActiveZone` values in config.
 - Edge zone seems too thin/thick:
-  - Re-select the edge (`Zone -> Top/Bottom/Left/Right`) and click a new thickness in the overlay.
+  - Re-select the edge (`Select zone -> Select Top/Bottom/Left/Right Edge...`) and click a new thickness in the overlay.
+- Trigger feels too eager or too strict:
+  - Try a different `Trigger Assist` preset.
+  - `Low` keeps the hot area narrow near edge/center; `Strong` ramps faster across the zone.
 - App seems inactive in fullscreen apps:
   - This is expected when fullscreen suspension is enabled.
 

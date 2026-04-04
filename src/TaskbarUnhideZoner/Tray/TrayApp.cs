@@ -4,6 +4,7 @@ using TaskbarUnhideZoner.Config;
 using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Models;
 using TaskbarUnhideZoner.Runtime;
+using TaskbarUnhideZoner.Services;
 using TaskbarUnhideZoner.UI;
 
 namespace TaskbarUnhideZoner.Tray;
@@ -282,6 +283,16 @@ internal sealed class TrayApp : ApplicationContext
         var quick = new ToolStripMenuItem("Quick") { CheckOnClick = true };
         var normal = new ToolStripMenuItem("Default") { CheckOnClick = true };
         var longDelay = new ToolStripMenuItem("Long") { CheckOnClick = true };
+        var custom = new ToolStripMenuItem("Custom (from config)") { Enabled = false, CheckOnClick = true };
+
+        void UpdateChecks()
+        {
+            var selected = GetSelectedDelayPreset();
+            quick.Checked = selected == DelayPreset.Quick;
+            normal.Checked = selected == DelayPreset.Default;
+            longDelay.Checked = selected == DelayPreset.Long;
+            custom.Checked = selected == null;
+        }
 
         void SetPreset(DelayPreset preset)
         {
@@ -291,24 +302,20 @@ internal sealed class TrayApp : ApplicationContext
             }
 
             _runtime.SetDelayPreset(preset);
-            var selectedMs = _runtime.Config.TriggerDelayMs;
-            quick.Checked = selectedMs == _runtime.Config.DelayPresets.QuickMs;
-            normal.Checked = selectedMs == _runtime.Config.DelayPresets.DefaultMs;
-            longDelay.Checked = selectedMs == _runtime.Config.DelayPresets.LongMs;
+            UpdateChecks();
         }
 
         quick.Click += (_, _) => SetPreset(DelayPreset.Quick);
         normal.Click += (_, _) => SetPreset(DelayPreset.Default);
         longDelay.Click += (_, _) => SetPreset(DelayPreset.Long);
 
-        var delayMs = _runtime.Config.TriggerDelayMs;
-        quick.Checked = delayMs == _runtime.Config.DelayPresets.QuickMs;
-        normal.Checked = delayMs == _runtime.Config.DelayPresets.DefaultMs;
-        longDelay.Checked = delayMs == _runtime.Config.DelayPresets.LongMs;
+        UpdateChecks();
 
         menu.DropDownItems.Add(quick);
         menu.DropDownItems.Add(normal);
         menu.DropDownItems.Add(longDelay);
+        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(custom);
         return menu;
     }
 
@@ -319,6 +326,17 @@ internal sealed class TrayApp : ApplicationContext
         var low = new ToolStripMenuItem("Low") { CheckOnClick = true };
         var medium = new ToolStripMenuItem("Medium") { CheckOnClick = true };
         var strong = new ToolStripMenuItem("Strong") { CheckOnClick = true };
+        var custom = new ToolStripMenuItem("Custom (from config)") { Enabled = false, CheckOnClick = true };
+
+        void UpdateChecks()
+        {
+            var selectedPreset = GetSelectedTriggerAssistPreset();
+            off.Checked = selectedPreset == TriggerAssistPreset.Off;
+            low.Checked = selectedPreset == TriggerAssistPreset.Low;
+            medium.Checked = selectedPreset == TriggerAssistPreset.Medium;
+            strong.Checked = selectedPreset == TriggerAssistPreset.Strong;
+            custom.Checked = selectedPreset == null;
+        }
 
         void SetPreset(TriggerAssistPreset preset)
         {
@@ -328,11 +346,7 @@ internal sealed class TrayApp : ApplicationContext
             }
 
             _runtime.SetTriggerAssistPreset(preset);
-            var selectedPreset = GetSelectedTriggerAssistPreset();
-            off.Checked = selectedPreset == TriggerAssistPreset.Off;
-            low.Checked = selectedPreset == TriggerAssistPreset.Low;
-            medium.Checked = selectedPreset == TriggerAssistPreset.Medium;
-            strong.Checked = selectedPreset == TriggerAssistPreset.Strong;
+            UpdateChecks();
         }
 
         off.Click += (_, _) => SetPreset(TriggerAssistPreset.Off);
@@ -340,43 +354,41 @@ internal sealed class TrayApp : ApplicationContext
         medium.Click += (_, _) => SetPreset(TriggerAssistPreset.Medium);
         strong.Click += (_, _) => SetPreset(TriggerAssistPreset.Strong);
 
-        var selected = GetSelectedTriggerAssistPreset();
-        off.Checked = selected == TriggerAssistPreset.Off;
-        low.Checked = selected == TriggerAssistPreset.Low;
-        medium.Checked = selected == TriggerAssistPreset.Medium;
-        strong.Checked = selected == TriggerAssistPreset.Strong;
+        UpdateChecks();
 
         menu.DropDownItems.Add(off);
         menu.DropDownItems.Add(low);
         menu.DropDownItems.Add(medium);
         menu.DropDownItems.Add(strong);
+        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(custom);
         return menu;
     }
 
-    private TriggerAssistPreset GetSelectedTriggerAssistPreset()
+    private DelayPreset? GetSelectedDelayPreset()
     {
-        var assist = _runtime.Config.Trigger.Assist;
-        if (!assist.Enabled)
+        var delayMs = _runtime.Config.TriggerDelayMs;
+        if (delayMs == _runtime.Config.DelayPresets.QuickMs)
         {
-            return TriggerAssistPreset.Off;
+            return DelayPreset.Quick;
         }
 
-        if (assist.MinDelayPercent == 90 && Math.Abs(assist.CurveExponent - 3.0) < 0.001)
+        if (delayMs == _runtime.Config.DelayPresets.DefaultMs)
         {
-            return TriggerAssistPreset.Low;
+            return DelayPreset.Default;
         }
 
-        if (assist.MinDelayPercent == 60 && Math.Abs(assist.CurveExponent - 1.7) < 0.001)
+        if (delayMs == _runtime.Config.DelayPresets.LongMs)
         {
-            return TriggerAssistPreset.Medium;
+            return DelayPreset.Long;
         }
 
-        if (assist.MinDelayPercent == 10 && Math.Abs(assist.CurveExponent - 0.55) < 0.001)
-        {
-            return TriggerAssistPreset.Strong;
-        }
+        return null;
+    }
 
-        return TriggerAssistPreset.Low;
+    private TriggerAssistPreset? GetSelectedTriggerAssistPreset()
+    {
+        return TriggerAssistPresets.DetectExact(_runtime.Config.Trigger.Assist);
     }
 
     private ToolStripMenuItem BuildZoneMenu()
