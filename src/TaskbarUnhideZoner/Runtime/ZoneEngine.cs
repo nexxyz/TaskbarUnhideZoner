@@ -6,6 +6,8 @@ namespace TaskbarUnhideZoner.Runtime;
 
 internal sealed class ZoneEngine : IDisposable
 {
+    private const long FullscreenCheckIntervalMs = 250;
+
     private readonly AppConfig _config;
     private readonly IZoneActivationHandler _handler;
     private readonly ZoneStateMachine _stateMachine;
@@ -13,6 +15,8 @@ internal sealed class ZoneEngine : IDisposable
     private IZoneMonitor? _monitor;
     private bool _running;
     private bool _zoneTriggered;
+    private long _lastFullscreenCheckElapsedMs = long.MinValue;
+    private bool _lastFullscreenState;
 
     public ZoneEngine(AppConfig config, IZoneActivationHandler handler)
     {
@@ -57,6 +61,8 @@ internal sealed class ZoneEngine : IDisposable
 
             _stateMachine.ForceOutside();
             _zoneTriggered = false;
+            _lastFullscreenCheckElapsedMs = long.MinValue;
+            _lastFullscreenState = false;
             _running = false;
         }
     }
@@ -74,7 +80,7 @@ internal sealed class ZoneEngine : IDisposable
 
     private void OnCursorPositionChanged(object? sender, CursorPositionEventArgs e)
     {
-        if (_config.Fullscreen.SuspendWhenFullscreenAppActive && FullscreenDetector.IsForegroundFullscreen())
+        if (IsFullscreenSuspended(e.ElapsedMs))
         {
             if (_zoneTriggered)
             {
@@ -100,5 +106,23 @@ internal sealed class ZoneEngine : IDisposable
 
         _handler.OnZoneTriggered(e.Position);
         _zoneTriggered = true;
+    }
+
+    private bool IsFullscreenSuspended(long elapsedMs)
+    {
+        if (!_config.Fullscreen.SuspendWhenFullscreenAppActive)
+        {
+            _lastFullscreenState = false;
+            return false;
+        }
+
+        var shouldRefresh = elapsedMs - _lastFullscreenCheckElapsedMs >= FullscreenCheckIntervalMs;
+        if (shouldRefresh)
+        {
+            _lastFullscreenState = FullscreenDetector.IsForegroundFullscreen();
+            _lastFullscreenCheckElapsedMs = elapsedMs;
+        }
+
+        return _lastFullscreenState;
     }
 }
