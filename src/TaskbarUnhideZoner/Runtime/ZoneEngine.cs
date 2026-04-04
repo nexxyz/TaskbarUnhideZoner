@@ -99,7 +99,8 @@ internal sealed class ZoneEngine : IDisposable
             _zoneTriggered = false;
         }
 
-        if (!_stateMachine.Update(inZone, e.ElapsedMs))
+        var triggerDelayMs = TriggerAssistDelay.ComputeDelayMs(_config, e.Position);
+        if (!_stateMachine.Update(inZone, e.ElapsedMs, triggerDelayMs))
         {
             return;
         }
