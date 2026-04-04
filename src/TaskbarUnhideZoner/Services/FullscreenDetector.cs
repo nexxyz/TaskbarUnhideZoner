@@ -6,6 +6,10 @@ namespace TaskbarUnhideZoner.Services;
 
 internal static class FullscreenDetector
 {
+    private static readonly object ClassCacheSync = new();
+    private static IntPtr _lastClassWindow;
+    private static bool _lastClassIsDesktopHost;
+
     public static bool IsForegroundFullscreen()
     {
         var hwnd = NativeMethods.GetForegroundWindow();
@@ -58,6 +62,14 @@ internal static class FullscreenDetector
 
     private static bool IsDesktopHostWindow(IntPtr hwnd)
     {
+        lock (ClassCacheSync)
+        {
+            if (hwnd == _lastClassWindow)
+            {
+                return _lastClassIsDesktopHost;
+            }
+        }
+
         var className = new StringBuilder(256);
         var len = NativeMethods.GetClassName(hwnd, className, className.Capacity);
         if (len <= 0)
@@ -66,9 +78,17 @@ internal static class FullscreenDetector
         }
 
         var name = className.ToString();
-        return string.Equals(name, "Progman", StringComparison.Ordinal)
-               || string.Equals(name, "WorkerW", StringComparison.Ordinal)
-               || string.Equals(name, "Shell_TrayWnd", StringComparison.Ordinal)
-               || string.Equals(name, "Shell_SecondaryTrayWnd", StringComparison.Ordinal);
+        var isDesktopHost = string.Equals(name, "Progman", StringComparison.Ordinal)
+                            || string.Equals(name, "WorkerW", StringComparison.Ordinal)
+                            || string.Equals(name, "Shell_TrayWnd", StringComparison.Ordinal)
+                            || string.Equals(name, "Shell_SecondaryTrayWnd", StringComparison.Ordinal);
+
+        lock (ClassCacheSync)
+        {
+            _lastClassWindow = hwnd;
+            _lastClassIsDesktopHost = isDesktopHost;
+        }
+
+        return isDesktopHost;
     }
 }
