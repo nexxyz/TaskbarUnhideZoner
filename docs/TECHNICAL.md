@@ -48,11 +48,11 @@ Installer output:
 
 1. Update installer version in `installer/TaskbarUnhideZoner.iss`.
 2. Commit and push to `main`.
-3. Create and push tag (for example `v0.9.4`):
+3. Create and push tag (for example `v0.9.5`):
 
 ```powershell
-git tag v0.9.4
-git push origin v0.9.4
+git tag v0.9.5
+git push origin v0.9.5
 ```
 
 4. GitHub Actions release workflow builds installer and publishes GitHub release with installer asset.

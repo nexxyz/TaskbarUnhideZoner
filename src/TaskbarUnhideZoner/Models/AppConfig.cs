@@ -49,10 +49,16 @@ internal sealed class DelayPresets
 
 internal sealed class ZoneConfig
 {
+    public ZoneMode Mode { get; set; } = ZoneMode.HotZone;
     public RectConfig ActiveZone { get; set; } = new() { X = 0, Y = 0, Width = 320, Height = 120 };
 
     public void Normalize()
     {
+        if (!Enum.IsDefined(typeof(ZoneMode), Mode))
+        {
+            Mode = ZoneMode.HotZone;
+        }
+
         ActiveZone ??= new RectConfig { X = 0, Y = 0, Width = 320, Height = 120 };
         ActiveZone.Normalize();
     }
@@ -75,10 +81,26 @@ internal sealed class RectConfig
 internal sealed class TriggerConfig
 {
     public int CooldownMs { get; set; } = 500;
+    public TriggerAssistConfig Assist { get; set; } = new();
 
     public void Normalize()
     {
         CooldownMs = Math.Clamp(CooldownMs, 0, 10000);
+        Assist ??= new TriggerAssistConfig();
+        Assist.Normalize();
+    }
+}
+
+internal sealed class TriggerAssistConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int MinDelayPercent { get; set; } = 90;
+    public double CurveExponent { get; set; } = 3.0;
+
+    public void Normalize()
+    {
+        MinDelayPercent = Math.Clamp(MinDelayPercent, 10, 100);
+        CurveExponent = Math.Clamp(CurveExponent, 0.35, 3.0);
     }
 }
 
@@ -95,9 +117,26 @@ internal enum EdgePosition
     Right
 }
 
+internal enum ZoneMode
+{
+    Top,
+    Bottom,
+    Left,
+    Right,
+    HotZone
+}
+
 internal enum DelayPreset
 {
     Quick,
     Default,
     Long
+}
+
+internal enum TriggerAssistPreset
+{
+    Off,
+    Low,
+    Medium,
+    Strong
 }

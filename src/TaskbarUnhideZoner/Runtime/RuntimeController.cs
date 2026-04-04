@@ -101,6 +101,15 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void SetEdgeZone(EdgePosition edge, Rectangle rectangle)
     {
+        Config.Zone.Mode = edge switch
+        {
+            EdgePosition.Top => ZoneMode.Top,
+            EdgePosition.Bottom => ZoneMode.Bottom,
+            EdgePosition.Left => ZoneMode.Left,
+            EdgePosition.Right => ZoneMode.Right,
+            _ => ZoneMode.HotZone
+        };
+
         Config.Zone.ActiveZone = new RectConfig
         {
             X = rectangle.X,
@@ -113,6 +122,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void SetHotZone(Rectangle rectangle)
     {
+        Config.Zone.Mode = ZoneMode.HotZone;
         Config.Zone.ActiveZone = new RectConfig
         {
             X = rectangle.X,
@@ -121,6 +131,15 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             Height = rectangle.Height
         };
         Save();
+    }
+
+    public void SetTriggerAssistPreset(TriggerAssistPreset preset)
+    {
+        lock (_sync)
+        {
+            ApplyTriggerAssistPreset(Config.Trigger.Assist, preset);
+            Save();
+        }
     }
 
     public void ReinitializeDetection()
@@ -251,6 +270,42 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private bool IsWriteCooldownElapsed()
     {
         return (DateTime.UtcNow - _lastStateWriteUtc).TotalMilliseconds >= 1500;
+    }
+
+    private static void ApplyTriggerAssistPreset(TriggerAssistConfig assist, TriggerAssistPreset preset)
+    {
+        switch (preset)
+        {
+            case TriggerAssistPreset.Off:
+                assist.Enabled = false;
+                assist.MinDelayPercent = 100;
+                assist.CurveExponent = 1.0;
+                return;
+
+            case TriggerAssistPreset.Low:
+                assist.Enabled = true;
+                assist.MinDelayPercent = 90;
+                assist.CurveExponent = 3.0;
+                return;
+
+            case TriggerAssistPreset.Medium:
+                assist.Enabled = true;
+                assist.MinDelayPercent = 60;
+                assist.CurveExponent = 1.7;
+                return;
+
+            case TriggerAssistPreset.Strong:
+                assist.Enabled = true;
+                assist.MinDelayPercent = 10;
+                assist.CurveExponent = 0.55;
+                return;
+
+            default:
+                assist.Enabled = true;
+                assist.MinDelayPercent = 90;
+                assist.CurveExponent = 3.0;
+                return;
+        }
     }
 
     private void RaiseStateChanged()

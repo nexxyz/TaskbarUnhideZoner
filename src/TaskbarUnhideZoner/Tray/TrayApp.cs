@@ -19,6 +19,7 @@ internal sealed class TrayApp : ApplicationContext
 
     private ToolStripMenuItem? _enabledItem;
     private ToolStripMenuItem? _delayMenu;
+    private ToolStripMenuItem? _assistMenu;
     private ToolStripMenuItem? _zoneMenu;
     private ToolStripMenuItem? _autohideInfoItem;
 
@@ -117,6 +118,7 @@ internal sealed class TrayApp : ApplicationContext
         _enabledItem.Text = BuildEnabledItemText(suspendedByAutohide, monitorUnavailable);
 
         if (_delayMenu != null) _delayMenu.Enabled = interactive;
+        if (_assistMenu != null) _assistMenu.Enabled = interactive;
         if (_zoneMenu != null) _zoneMenu.Enabled = interactive;
 
         if (_autohideInfoItem != null)
@@ -192,6 +194,7 @@ internal sealed class TrayApp : ApplicationContext
         };
 
         _delayMenu = BuildDelayMenu();
+        _assistMenu = BuildTriggerAssistMenu();
         _zoneMenu = BuildZoneMenu();
 
         var openConfig = new ToolStripMenuItem("Open Config");
@@ -212,6 +215,7 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(_enabledItem);
         menu.Items.Add(startupItem);
         menu.Items.Add(_delayMenu);
+        menu.Items.Add(_assistMenu);
         menu.Items.Add(_zoneMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_autohideInfoItem);
@@ -308,9 +312,76 @@ internal sealed class TrayApp : ApplicationContext
         return menu;
     }
 
+    private ToolStripMenuItem BuildTriggerAssistMenu()
+    {
+        var menu = new ToolStripMenuItem("Trigger Assist");
+        var off = new ToolStripMenuItem("Off") { CheckOnClick = true };
+        var low = new ToolStripMenuItem("Low") { CheckOnClick = true };
+        var medium = new ToolStripMenuItem("Medium") { CheckOnClick = true };
+        var strong = new ToolStripMenuItem("Strong") { CheckOnClick = true };
+
+        void SetPreset(TriggerAssistPreset preset)
+        {
+            if (_initializing)
+            {
+                return;
+            }
+
+            _runtime.SetTriggerAssistPreset(preset);
+            var selectedPreset = GetSelectedTriggerAssistPreset();
+            off.Checked = selectedPreset == TriggerAssistPreset.Off;
+            low.Checked = selectedPreset == TriggerAssistPreset.Low;
+            medium.Checked = selectedPreset == TriggerAssistPreset.Medium;
+            strong.Checked = selectedPreset == TriggerAssistPreset.Strong;
+        }
+
+        off.Click += (_, _) => SetPreset(TriggerAssistPreset.Off);
+        low.Click += (_, _) => SetPreset(TriggerAssistPreset.Low);
+        medium.Click += (_, _) => SetPreset(TriggerAssistPreset.Medium);
+        strong.Click += (_, _) => SetPreset(TriggerAssistPreset.Strong);
+
+        var selected = GetSelectedTriggerAssistPreset();
+        off.Checked = selected == TriggerAssistPreset.Off;
+        low.Checked = selected == TriggerAssistPreset.Low;
+        medium.Checked = selected == TriggerAssistPreset.Medium;
+        strong.Checked = selected == TriggerAssistPreset.Strong;
+
+        menu.DropDownItems.Add(off);
+        menu.DropDownItems.Add(low);
+        menu.DropDownItems.Add(medium);
+        menu.DropDownItems.Add(strong);
+        return menu;
+    }
+
+    private TriggerAssistPreset GetSelectedTriggerAssistPreset()
+    {
+        var assist = _runtime.Config.Trigger.Assist;
+        if (!assist.Enabled)
+        {
+            return TriggerAssistPreset.Off;
+        }
+
+        if (assist.MinDelayPercent == 90 && Math.Abs(assist.CurveExponent - 3.0) < 0.001)
+        {
+            return TriggerAssistPreset.Low;
+        }
+
+        if (assist.MinDelayPercent == 60 && Math.Abs(assist.CurveExponent - 1.7) < 0.001)
+        {
+            return TriggerAssistPreset.Medium;
+        }
+
+        if (assist.MinDelayPercent == 10 && Math.Abs(assist.CurveExponent - 0.55) < 0.001)
+        {
+            return TriggerAssistPreset.Strong;
+        }
+
+        return TriggerAssistPreset.Low;
+    }
+
     private ToolStripMenuItem BuildZoneMenu()
     {
-        var menu = new ToolStripMenuItem("Zone");
+        var menu = new ToolStripMenuItem("Select zone");
 
         menu.DropDownItems.Add(CreateEdgeItem("Select Top Edge...", EdgePosition.Top));
         menu.DropDownItems.Add(CreateEdgeItem("Select Bottom Edge...", EdgePosition.Bottom));
@@ -339,7 +410,7 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge);
+        var rect = EdgeZoneOverlayForm.SelectEdgeRectangle(edge, _runtime.Config.Trigger.Assist);
         if (rect == null)
         {
             return;
@@ -357,7 +428,7 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        var rect = HotZoneOverlayForm.SelectRectangle();
+        var rect = HotZoneOverlayForm.SelectRectangle(_runtime.Config.Trigger.Assist);
         if (rect == null)
         {
             return;

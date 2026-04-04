@@ -1,13 +1,22 @@
+using TaskbarUnhideZoner.Models;
+
 namespace TaskbarUnhideZoner.UI;
 
 internal sealed class HotZoneOverlayForm : Form
 {
+    private readonly bool _assistEnabled;
+    private readonly double _assistStrength;
+    private readonly double _assistCurve;
     private bool _dragging;
     private Point _dragStart;
     private Rectangle _selection;
 
-    private HotZoneOverlayForm()
+    private HotZoneOverlayForm(TriggerAssistConfig assist)
     {
+        _assistEnabled = assist.Enabled;
+        _assistStrength = 1.0 - (Math.Clamp(assist.MinDelayPercent, 10, 100) / 100.0);
+        _assistCurve = Math.Clamp(assist.CurveExponent, 0.35, 3.0);
+
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         Bounds = SystemInformation.VirtualScreen;
@@ -16,15 +25,15 @@ internal sealed class HotZoneOverlayForm : Form
         KeyPreview = true;
         DoubleBuffered = true;
         BackColor = Color.Black;
-        Opacity = 0.18;
+        Opacity = 0.30;
         Cursor = Cursors.Cross;
     }
 
     public Rectangle? SelectedRectangle { get; private set; }
 
-    public static Rectangle? SelectRectangle()
+    public static Rectangle? SelectRectangle(TriggerAssistConfig assist)
     {
-        using var form = new HotZoneOverlayForm();
+        using var form = new HotZoneOverlayForm(assist);
         return form.ShowDialog() == DialogResult.OK ? form.SelectedRectangle : null;
     }
 
@@ -112,11 +121,66 @@ internal sealed class HotZoneOverlayForm : Form
             _selection.Width,
             _selection.Height);
 
-        using var fill = new SolidBrush(Color.FromArgb(90, 80, 180, 255));
+        DrawGradientFill(e.Graphics, localSelection);
         using var border = new Pen(Color.FromArgb(230, 170, 230, 255), 2f);
 
-        e.Graphics.FillRectangle(fill, localSelection);
         e.Graphics.DrawRectangle(border, localSelection);
+    }
+
+    private void DrawGradientFill(Graphics graphics, Rectangle localSelection)
+    {
+        if (!_assistEnabled || _assistStrength <= 0.001)
+        {
+            using var flatFill = new SolidBrush(Color.FromArgb(120, 70, 140, 230));
+            graphics.FillRectangle(flatFill, localSelection);
+            return;
+        }
+
+        var weakColor = Color.FromArgb(35, 125, 245);
+        var strongColor = Color.FromArgb(255, 20, 20);
+        const int cellSize = 14;
+        var centerX = localSelection.Left + (localSelection.Width / 2.0);
+        var centerY = localSelection.Top + (localSelection.Height / 2.0);
+        var halfW = localSelection.Width / 2.0;
+        var halfH = localSelection.Height / 2.0;
+        var maxDistance = Math.Sqrt((halfW * halfW) + (halfH * halfH));
+        if (maxDistance <= 0.001)
+        {
+            return;
+        }
+
+        for (var y = localSelection.Top; y < localSelection.Bottom; y += cellSize)
+        {
+            for (var x = localSelection.Left; x < localSelection.Right; x += cellSize)
+            {
+                var w = Math.Min(cellSize, localSelection.Right - x);
+                var h = Math.Min(cellSize, localSelection.Bottom - y);
+                var sampleX = x + (w / 2.0);
+                var sampleY = y + (h / 2.0);
+
+                var dx = sampleX - centerX;
+                var dy = sampleY - centerY;
+                var distance = Math.Sqrt((dx * dx) + (dy * dy));
+                var closeness = 1.0 - Math.Clamp(distance / maxDistance, 0.0, 1.0);
+                var boost = Math.Pow(closeness, _assistCurve);
+                var reduction = boost * _assistStrength;
+                var visualHeat = _assistStrength > 0.001 ? reduction / _assistStrength : 0.0;
+                var alpha = 55 + (int)(150 * visualHeat);
+                var r = Lerp(weakColor.R, strongColor.R, visualHeat);
+                var g = Lerp(weakColor.G, strongColor.G, visualHeat);
+                var b = Lerp(weakColor.B, strongColor.B, visualHeat);
+                var color = Color.FromArgb(alpha, r, g, b);
+
+                using var brush = new SolidBrush(color);
+                graphics.FillRectangle(brush, x, y, w, h);
+            }
+        }
+    }
+
+    private static int Lerp(int a, int b, double t)
+    {
+        var clamped = Math.Clamp(t, 0.0, 1.0);
+        return (int)Math.Round(a + ((b - a) * clamped));
     }
 
     private static Rectangle Normalize(Point a, Point b)

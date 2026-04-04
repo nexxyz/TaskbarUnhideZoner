@@ -24,8 +24,10 @@ internal sealed class ZoneStateMachine
 
     public ZoneState State => _state;
 
-    public bool Update(bool inZone, long nowMs)
+    public bool Update(bool inZone, long nowMs, int? triggerDelayOverrideMs = null)
     {
+        var triggerDelayMs = Math.Max(0, triggerDelayOverrideMs ?? _triggerDelayMs());
+
         switch (_state)
         {
             case ZoneState.OutsideZone:
@@ -44,7 +46,7 @@ internal sealed class ZoneStateMachine
                     return false;
                 }
 
-                if (nowMs - _enteredAtMs < _triggerDelayMs())
+                if (nowMs - _enteredAtMs < triggerDelayMs)
                 {
                     return false;
                 }
