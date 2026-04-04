@@ -137,7 +137,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         lock (_sync)
         {
-            ApplyTriggerAssistPreset(Config.Trigger.Assist, preset);
+            TriggerAssistPresets.Apply(Config.Trigger.Assist, preset);
             Save();
         }
     }
@@ -270,42 +270,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private bool IsWriteCooldownElapsed()
     {
         return (DateTime.UtcNow - _lastStateWriteUtc).TotalMilliseconds >= 1500;
-    }
-
-    private static void ApplyTriggerAssistPreset(TriggerAssistConfig assist, TriggerAssistPreset preset)
-    {
-        switch (preset)
-        {
-            case TriggerAssistPreset.Off:
-                assist.Enabled = false;
-                assist.MinDelayPercent = 100;
-                assist.CurveExponent = 1.0;
-                return;
-
-            case TriggerAssistPreset.Low:
-                assist.Enabled = true;
-                assist.MinDelayPercent = 90;
-                assist.CurveExponent = 3.0;
-                return;
-
-            case TriggerAssistPreset.Medium:
-                assist.Enabled = true;
-                assist.MinDelayPercent = 60;
-                assist.CurveExponent = 1.7;
-                return;
-
-            case TriggerAssistPreset.Strong:
-                assist.Enabled = true;
-                assist.MinDelayPercent = 10;
-                assist.CurveExponent = 0.55;
-                return;
-
-            default:
-                assist.Enabled = true;
-                assist.MinDelayPercent = 90;
-                assist.CurveExponent = 3.0;
-                return;
-        }
     }
 
     private void RaiseStateChanged()
