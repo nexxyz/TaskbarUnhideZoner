@@ -105,6 +105,19 @@ Taskbar reveal strategy:
   - On exit, restore state only if this app changed it.
   - Do not leave taskbar state unintentionally altered after normal shutdown.
 
+## Lifecycle hardening
+
+- Tray lifecycle must be idempotent on shutdown (single guarded shutdown path).
+- Subscribe and unsubscribe global runtime handlers in one place:
+  - `Application.ApplicationExit`
+  - `Application.ThreadException`
+  - `AppDomain.CurrentDomain.ProcessExit`
+  - `AppDomain.CurrentDomain.UnhandledException`
+  - `TaskScheduler.UnobservedTaskException`
+- On fatal/unhandled paths, log best-effort context and run guarded cleanup.
+- Cleanup should be safe when called multiple times and must not throw.
+- Normal menu exit and global-exit paths share the same cleanup routine.
+
 ## Zone state machine
 
 The runtime decision flow is modeled as a small explicit state machine to keep behavior deterministic and testable.
