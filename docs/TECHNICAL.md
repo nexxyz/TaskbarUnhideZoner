@@ -46,16 +46,36 @@ Installer output:
 
 ## Release flow
 
+Use `RELEASE_CHECKLIST.md` for the full step-by-step release process and manual verification matrix.
+
 1. Update installer version in `installer/TaskbarUnhideZoner.iss`.
 2. Commit and push to `main`.
-3. Create and push tag (for example `v0.9.8`):
+3. Create and push tag (for example `v0.9.9`):
 
 ```powershell
-git tag v0.9.8
-git push origin v0.9.8
+git tag v0.9.9
+git push origin v0.9.9
 ```
 
 4. GitHub Actions release workflow builds installer and publishes GitHub release with installer asset.
+
+## Pre-release validation (quick)
+
+Run before tagging:
+
+```powershell
+dotnet build TaskbarUnhideZoner.slnx
+dotnet test TaskbarUnhideZoner.slnx
+dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --harness
+```
+
+Then do a quick manual smoke:
+
+- Open tray menu (left and right click)
+- Toggle Enable and Start with Windows
+- Verify `Trigger Delay` and `Trigger Assist` presets plus `Custom (from config)` visibility behavior
+- Re-select one edge zone and one hot zone
+- Confirm app suspends while taskbar autohide is off
 
 ## CI and quality report
 

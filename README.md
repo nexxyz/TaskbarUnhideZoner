@@ -39,6 +39,19 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
       - `Hot Zone` opens a freeform rectangle draw overlay
 4. Keep `Enable Taskbar Unhide Zoner` checked.
 
+### Preset behavior
+
+- `Trigger Delay`: `Quick`, `Default`, `Long`
+- `Trigger Assist`: `Off`, `Low`, `Medium`, `Strong`
+- If config values do not exactly match presets, the menu shows `Custom (from config)` as active.
+- Choosing a preset immediately applies it and replaces custom values for that setting.
+
+### Runtime apply behavior
+
+- Menu changes apply immediately during runtime.
+- Zone re-selection (`Select zone`) reinitializes detection immediately.
+- Manual config edits are loaded on next app start.
+
 ### Notes about auto-hide
 
 - If Windows taskbar auto-hide is off, the app suspends monitoring.
@@ -91,3 +104,4 @@ Logs:
 ## Technical notes
 
 - Build/release and developer workflows are documented in `docs/TECHNICAL.md`.
+- Release execution checklist is in `RELEASE_CHECKLIST.md`.

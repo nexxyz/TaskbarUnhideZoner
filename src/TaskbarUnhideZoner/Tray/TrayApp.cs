@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using TaskbarUnhideZoner.Config;
 using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Models;
@@ -25,6 +26,7 @@ internal sealed partial class TrayApp : ApplicationContext
     private ToolStripMenuItem? _autohideInfoItem;
 
     private bool _initializing = true;
+    private bool _shutdownStarted;
 
     public TrayApp(RuntimeController runtime, EventWaitHandle alreadyRunningEvent)
     {
@@ -48,6 +50,7 @@ internal sealed partial class TrayApp : ApplicationContext
             executeOnlyOnce: false);
 
         _runtime.StateChanged += OnRuntimeStateChanged;
+        SubscribeRuntimeEvents();
 
         _notifyIcon.MouseUp += (_, e) =>
         {
@@ -93,6 +96,11 @@ internal sealed partial class TrayApp : ApplicationContext
 
     private void OnRuntimeStateChanged(object? sender, EventArgs e)
     {
+        if (_shutdownStarted)
+        {
+            return;
+        }
+
         if (_uiContext == null)
         {
             RefreshUiState();
@@ -134,20 +142,73 @@ internal sealed partial class TrayApp : ApplicationContext
 
     private void Exit()
     {
+        SafeShutdown("MenuExit", exitApplication: true);
+    }
+
+    private void SubscribeRuntimeEvents()
+    {
+        try { Application.ApplicationExit += OnApplicationExit; } catch { }
+        try { Application.ThreadException += OnThreadException; } catch { }
+        try { AppDomain.CurrentDomain.ProcessExit += OnProcessExit; } catch { }
+        try { AppDomain.CurrentDomain.UnhandledException += OnUnhandledException; } catch { }
+        try { TaskScheduler.UnobservedTaskException += OnUnobservedTaskException; } catch { }
+    }
+
+    private void UnsubscribeRuntimeEvents()
+    {
+        try { Application.ApplicationExit -= OnApplicationExit; } catch { }
+        try { Application.ThreadException -= OnThreadException; } catch { }
+        try { AppDomain.CurrentDomain.ProcessExit -= OnProcessExit; } catch { }
+        try { AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException; } catch { }
+        try { TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException; } catch { }
+    }
+
+    private void SafeShutdown(string reason, bool exitApplication)
+    {
+        if (_shutdownStarted)
+        {
+            return;
+        }
+
+        _shutdownStarted = true;
+
+        UnsubscribeRuntimeEvents();
         _runtime.StateChanged -= OnRuntimeStateChanged;
 
-        try
-        {
-            _alreadyRunningWait.Unregister(null);
-            _menuAnchor.Dispose();
-            _notifyIcon.Visible = false;
-            _notifyIcon.Dispose();
-        }
-        catch
-        {
-        }
+        try { RollingFileLogger.Info($"[Shutdown] {reason}"); } catch { }
 
-        Application.Exit();
+        try { _alreadyRunningWait.Unregister(null); } catch { }
+        try { _menuAnchor.Dispose(); } catch { }
+        try { _notifyIcon.Visible = false; } catch { }
+        try { _notifyIcon.Dispose(); } catch { }
+
+        if (exitApplication)
+        {
+            try { Application.Exit(); } catch { }
+        }
+    }
+
+    private void OnApplicationExit(object? sender, EventArgs e) => SafeShutdown("ApplicationExit", exitApplication: false);
+
+    private void OnProcessExit(object? sender, EventArgs e) => SafeShutdown("ProcessExit", exitApplication: false);
+
+    private void OnThreadException(object sender, ThreadExceptionEventArgs e)
+    {
+        try { RollingFileLogger.Error($"UI thread exception: {e.Exception}"); } catch { }
+        SafeShutdown("ThreadException", exitApplication: false);
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        try { RollingFileLogger.Error($"Unhandled exception: {e.ExceptionObject}"); } catch { }
+        SafeShutdown("UnhandledException", exitApplication: false);
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        try { RollingFileLogger.Error($"Unobserved task exception: {e.Exception}"); } catch { }
+        try { e.SetObserved(); } catch { }
+        SafeShutdown("UnobservedTaskException", exitApplication: false);
     }
 
     private ContextMenuStrip BuildMenu()
