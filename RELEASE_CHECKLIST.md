@@ -1,10 +1,10 @@
 - Build + tests
-  - `dotnet build TaskbarUnhideZoner.slnx`
-  - `dotnet test TaskbarUnhideZoner.slnx`
+  - `dotnet build TaskbarUnhideZoner.slnx -c Release`
+  - `dotnet test TaskbarUnhideZoner.slnx -c Release`
 
 - Harness + quick automated checks
-  - `dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --harness`
-  - Optional: `dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --test-unhide-loop --interval-ms 5000 --duration-sec 60`
+  - `dotnet run -c Release --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --harness`
+  - Optional: `dotnet run -c Release --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --test-unhide-loop --interval-ms 5000 --duration-sec 60`
 
 - Manual smoke run
   - Run `src/TaskbarUnhideZoner/bin/Release/net8.0-windows/TaskbarUnhideZoner.exe`

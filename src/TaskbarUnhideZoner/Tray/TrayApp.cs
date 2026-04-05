@@ -195,20 +195,20 @@ internal sealed partial class TrayApp : ApplicationContext
     private void OnThreadException(object sender, ThreadExceptionEventArgs e)
     {
         try { RollingFileLogger.Error($"UI thread exception: {e.Exception}"); } catch { }
-        SafeShutdown("ThreadException", exitApplication: false);
+        SafeShutdown("ThreadException", exitApplication: true);
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         try { RollingFileLogger.Error($"Unhandled exception: {e.ExceptionObject}"); } catch { }
-        SafeShutdown("UnhandledException", exitApplication: false);
+        SafeShutdown("UnhandledException", exitApplication: true);
     }
 
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         try { RollingFileLogger.Error($"Unobserved task exception: {e.Exception}"); } catch { }
         try { e.SetObserved(); } catch { }
-        SafeShutdown("UnobservedTaskException", exitApplication: false);
+        SafeShutdown("UnobservedTaskException", exitApplication: true);
     }
 
     private ContextMenuStrip BuildMenu()
