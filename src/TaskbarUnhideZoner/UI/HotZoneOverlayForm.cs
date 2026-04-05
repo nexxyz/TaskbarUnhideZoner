@@ -13,9 +13,7 @@ internal sealed class HotZoneOverlayForm : Form
 
     private HotZoneOverlayForm(TriggerAssistConfig assist)
     {
-        _assistEnabled = assist.Enabled;
-        _assistStrength = 1.0 - (Math.Clamp(assist.MinDelayPercent, 10, 100) / 100.0);
-        _assistCurve = Math.Clamp(assist.CurveExponent, 0.35, 3.0);
+        OverlayHeatMap.NormalizeAssist(assist, out _assistEnabled, out _assistStrength, out _assistCurve);
 
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
@@ -162,25 +160,13 @@ internal sealed class HotZoneOverlayForm : Form
                 var dy = sampleY - centerY;
                 var distance = Math.Sqrt((dx * dx) + (dy * dy));
                 var closeness = 1.0 - Math.Clamp(distance / maxDistance, 0.0, 1.0);
-                var boost = Math.Pow(closeness, _assistCurve);
-                var reduction = boost * _assistStrength;
-                var visualHeat = _assistStrength > 0.001 ? reduction / _assistStrength : 0.0;
-                var alpha = 55 + (int)(150 * visualHeat);
-                var r = Lerp(weakColor.R, strongColor.R, visualHeat);
-                var g = Lerp(weakColor.G, strongColor.G, visualHeat);
-                var b = Lerp(weakColor.B, strongColor.B, visualHeat);
-                var color = Color.FromArgb(alpha, r, g, b);
+                var visualHeat = OverlayHeatMap.ComputeVisualHeat(closeness, _assistStrength, _assistCurve);
+                var color = OverlayHeatMap.BlendHeatColor(weakColor, strongColor, visualHeat);
 
                 using var brush = new SolidBrush(color);
                 graphics.FillRectangle(brush, x, y, w, h);
             }
         }
-    }
-
-    private static int Lerp(int a, int b, double t)
-    {
-        var clamped = Math.Clamp(t, 0.0, 1.0);
-        return (int)Math.Round(a + ((b - a) * clamped));
     }
 
     private static Rectangle Normalize(Point a, Point b)
