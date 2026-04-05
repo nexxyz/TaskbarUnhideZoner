@@ -6,6 +6,7 @@ namespace TaskbarUnhideZoner.Services;
 
 internal static class FullscreenDetector
 {
+    private const int MonitorEdgeSlackPx = 2;
     private static readonly object ClassCacheSync = new();
     private static IntPtr _lastClassWindow;
     private static bool _lastClassIsDesktopHost;
@@ -13,27 +14,43 @@ internal static class FullscreenDetector
     public static bool IsForegroundFullscreen()
     {
         var hwnd = NativeMethods.GetForegroundWindow();
-        if (hwnd == IntPtr.Zero)
+        if (hwnd == IntPtr.Zero || IsIgnoredForegroundWindow(hwnd))
         {
             return false;
         }
 
+        if (!TryGetForegroundRect(hwnd, out var rect))
+        {
+            return false;
+        }
+
+        if (!TryGetMonitorRect(hwnd, out var monitorRect))
+        {
+            return false;
+        }
+
+        return CoversMonitor(rect, monitorRect);
+    }
+
+    private static bool IsIgnoredForegroundWindow(IntPtr hwnd)
+    {
         var shell = NativeMethods.FindWindow("Shell_TrayWnd", null);
-        if (hwnd == shell)
+        return hwnd == shell || IsDesktopHostWindow(hwnd);
+    }
+
+    private static bool TryGetForegroundRect(IntPtr hwnd, out NativeMethods.Rect rect)
+    {
+        if (!NativeMethods.GetWindowRect(hwnd, out rect))
         {
             return false;
         }
 
-        if (IsDesktopHostWindow(hwnd))
-        {
-            return false;
-        }
+        return true;
+    }
 
-        if (!NativeMethods.GetWindowRect(hwnd, out var rect))
-        {
-            return false;
-        }
-
+    private static bool TryGetMonitorRect(IntPtr hwnd, out NativeMethods.Rect monitorRect)
+    {
+        monitorRect = default;
         var monitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MonitorDefaultToNearest);
         if (monitor == IntPtr.Zero)
         {
@@ -46,18 +63,21 @@ internal static class FullscreenDetector
             return false;
         }
 
-        var fgWidth = rect.Right - rect.Left;
-        var fgHeight = rect.Bottom - rect.Top;
-        var monWidth = info.RcMonitor.Right - info.RcMonitor.Left;
-        var monHeight = info.RcMonitor.Bottom - info.RcMonitor.Top;
+        monitorRect = info.RcMonitor;
+        return true;
+    }
 
-        const int slack = 2;
-        var coversMonitor = Math.Abs(rect.Left - info.RcMonitor.Left) <= slack
-                            && Math.Abs(rect.Top - info.RcMonitor.Top) <= slack
-                            && Math.Abs(fgWidth - monWidth) <= slack
-                            && Math.Abs(fgHeight - monHeight) <= slack;
+    private static bool CoversMonitor(NativeMethods.Rect windowRect, NativeMethods.Rect monitorRect)
+    {
+        var fgWidth = windowRect.Right - windowRect.Left;
+        var fgHeight = windowRect.Bottom - windowRect.Top;
+        var monWidth = monitorRect.Right - monitorRect.Left;
+        var monHeight = monitorRect.Bottom - monitorRect.Top;
 
-        return coversMonitor;
+        return Math.Abs(windowRect.Left - monitorRect.Left) <= MonitorEdgeSlackPx
+               && Math.Abs(windowRect.Top - monitorRect.Top) <= MonitorEdgeSlackPx
+               && Math.Abs(fgWidth - monWidth) <= MonitorEdgeSlackPx
+               && Math.Abs(fgHeight - monHeight) <= MonitorEdgeSlackPx;
     }
 
     private static bool IsDesktopHostWindow(IntPtr hwnd)
