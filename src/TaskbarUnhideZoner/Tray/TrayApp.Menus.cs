@@ -12,6 +12,7 @@ internal sealed partial class TrayApp
         var quick = new ToolStripMenuItem("Quick") { CheckOnClick = true };
         var normal = new ToolStripMenuItem("Default") { CheckOnClick = true };
         var longDelay = new ToolStripMenuItem("Long") { CheckOnClick = true };
+        var customSeparator = new ToolStripSeparator();
         var custom = new ToolStripMenuItem("Custom (from config)") { Enabled = false, CheckOnClick = false };
 
         void UpdateChecks()
@@ -22,6 +23,7 @@ internal sealed partial class TrayApp
             normal.Checked = selected == DelayPreset.Default;
             longDelay.Checked = selected == DelayPreset.Long;
             custom.Checked = isCustom;
+            customSeparator.Visible = isCustom;
             custom.Visible = isCustom;
         }
 
@@ -45,7 +47,7 @@ internal sealed partial class TrayApp
         menu.DropDownItems.Add(quick);
         menu.DropDownItems.Add(normal);
         menu.DropDownItems.Add(longDelay);
-        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(customSeparator);
         menu.DropDownItems.Add(custom);
         return menu;
     }
@@ -57,6 +59,7 @@ internal sealed partial class TrayApp
         var low = new ToolStripMenuItem("Low") { CheckOnClick = true };
         var medium = new ToolStripMenuItem("Medium") { CheckOnClick = true };
         var strong = new ToolStripMenuItem("Strong") { CheckOnClick = true };
+        var customSeparator = new ToolStripSeparator();
         var custom = new ToolStripMenuItem("Custom (from config)") { Enabled = false, CheckOnClick = false };
 
         void UpdateChecks()
@@ -68,6 +71,7 @@ internal sealed partial class TrayApp
             medium.Checked = selectedPreset == TriggerAssistPreset.Medium;
             strong.Checked = selectedPreset == TriggerAssistPreset.Strong;
             custom.Checked = isCustom;
+            customSeparator.Visible = isCustom;
             custom.Visible = isCustom;
         }
 
@@ -93,7 +97,7 @@ internal sealed partial class TrayApp
         menu.DropDownItems.Add(low);
         menu.DropDownItems.Add(medium);
         menu.DropDownItems.Add(strong);
-        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(customSeparator);
         menu.DropDownItems.Add(custom);
         return menu;
     }
