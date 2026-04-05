@@ -38,16 +38,16 @@ Use a human-editable JSON config file with safe defaults. The menu changes updat
 
 Current configurable fields:
 
-- `enabled`
-- `startWithWindows`
-- `triggerDelayMs`
-- Preset mapping (`quickMs`, `defaultMs`, `longMs`)
+- `Enabled`
+- `StartWithWindows`
+- `TriggerDelayMs`
+- Preset mapping (`DelayPresets.QuickMs`, `DelayPresets.DefaultMs`, `DelayPresets.LongMs`)
 - Zone mode (`Zone.Mode`: Top/Bottom/Left/Right/HotZone)
 - Unified active zone rectangle (`Zone.ActiveZone`) used by runtime hit-testing
 - Trigger behavior settings (`Trigger.CooldownMs`, `Trigger.Assist`)
 - Trigger Assist tuning (`Trigger.Assist.Enabled`, `MinDelayPercent`, `CurveExponent`)
-- Fullscreen behavior setting (`suspendWhenFullscreenAppActive`)
-- Autohide state check interval (`autohideStatePollSeconds`, default 5)
+- Fullscreen behavior setting (`Fullscreen.SuspendWhenFullscreenAppActive`)
+- Autohide state check interval (`AutohideStatePollSeconds`, default 5)
 
 ### Preset menu policy
 

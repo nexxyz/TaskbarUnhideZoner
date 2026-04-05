@@ -50,11 +50,11 @@ Use `RELEASE_CHECKLIST.md` for the full step-by-step release process and manual 
 
 1. Update installer version in `installer/TaskbarUnhideZoner.iss`.
 2. Commit and push to `main`.
-3. Create and push tag (for example `v0.9.9`):
+3. Create and push tag (for example `vX.Y.Z`):
 
 ```powershell
-git tag v0.9.9
-git push origin v0.9.9
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 4. GitHub Actions release workflow builds installer and publishes GitHub release with installer asset.
