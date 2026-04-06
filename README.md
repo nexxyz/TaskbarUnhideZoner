@@ -1,7 +1,5 @@
 # Taskbar Unhide Zoner
 
-> Under construction: usable today, still being refined.
-
 Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep taskbar auto-hide on (for cleaner desktop and reduced OLED burn-in risk), while making taskbar reveal intentional through a configurable sensitivity zone.
 
 ## What it does
