@@ -55,6 +55,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - If Windows taskbar auto-hide is off, the app suspends monitoring.
 - In that state, the enable item is grayed out and shows a message indicating auto-hide is off.
 - Re-enable auto-hide in Windows settings, then reopen tray menu or wait for periodic refresh.
+- If a previous app run crashed after temporarily turning auto-hide off, the next startup attempts a one-time restore.
 
 ### Already running behavior
 

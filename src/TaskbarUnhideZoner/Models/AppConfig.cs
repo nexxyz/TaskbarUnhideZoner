@@ -6,6 +6,8 @@ internal sealed class AppConfig
 
     public bool StartWithWindows { get; set; }
 
+    public bool PendingAutohideRestore { get; set; }
+
     public int TriggerDelayMs { get; set; } = 350;
 
     public int AutohideStatePollSeconds { get; set; } = 5;

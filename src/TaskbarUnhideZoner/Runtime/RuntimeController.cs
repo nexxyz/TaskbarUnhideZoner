@@ -8,8 +8,9 @@ namespace TaskbarUnhideZoner.Runtime;
 internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 {
     private readonly object _sync = new();
-    private readonly ZoneEngine _engine;
-    private readonly TaskbarStateService _taskbarState;
+    private readonly IZoneEngineController _engine;
+    private readonly ITaskbarStateService _taskbarState;
+    private readonly Action<AppConfig> _saveConfig;
     private readonly System.Threading.Timer _autohidePollTimer;
     private readonly int _autohidePollMs;
 
@@ -19,14 +20,30 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     private string? _monitoringError;
 
     public RuntimeController(AppConfig config)
+        : this(
+            config,
+            new TaskbarStateService(),
+            handler => new ZoneEngine(config, handler),
+            persistedConfig => ConfigStore.Save(Paths.ConfigFilePath, persistedConfig),
+            StartupManager.IsEnabled())
+    {
+    }
+
+    internal RuntimeController(
+        AppConfig config,
+        ITaskbarStateService taskbarState,
+        Func<IZoneActivationHandler, IZoneEngineController> engineFactory,
+        Action<AppConfig> saveConfig,
+        bool startupEnabled)
     {
         Config = config;
-        _taskbarState = new TaskbarStateService();
-        _engine = new ZoneEngine(config, this);
-        Config.StartWithWindows = StartupManager.IsEnabled();
+        _taskbarState = taskbarState;
+        _engine = engineFactory(this);
+        _saveConfig = saveConfig;
+        Config.StartWithWindows = startupEnabled;
         _autohidePollMs = Math.Clamp(Config.AutohideStatePollSeconds, 5, 300) * 1000;
 
-        _baselineAutoHideEnabled = _taskbarState.IsAutoHideEnabled();
+        _baselineAutoHideEnabled = InitializeAutohideState();
         ApplyRuntimeGateLocked();
         Save();
 
@@ -200,7 +217,9 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             if (_taskbarState.SetAutoHideEnabled(false))
             {
                 _managedVisibleActive = true;
+                Config.PendingAutohideRestore = true;
                 _lastStateWriteUtc = DateTime.UtcNow;
+                Save();
             }
         }
 
@@ -220,7 +239,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
     public void Save()
     {
-        ConfigStore.Save(Paths.ConfigFilePath, Config);
+        _saveConfig(Config);
     }
 
     public void Dispose()
@@ -255,6 +274,20 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         }
     }
 
+    private bool InitializeAutohideState()
+    {
+        var observed = _taskbarState.IsAutoHideEnabled();
+
+        if (Config.PendingAutohideRestore && !observed)
+        {
+            _taskbarState.SetAutoHideEnabled(true);
+            observed = _taskbarState.IsAutoHideEnabled();
+        }
+
+        Config.PendingAutohideRestore = false;
+        return observed;
+    }
+
     private void RestoreBaselineLocked()
     {
         if (!_managedVisibleActive)
@@ -262,9 +295,13 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             return;
         }
 
-        _taskbarState.SetAutoHideEnabled(_baselineAutoHideEnabled);
-        _managedVisibleActive = false;
-        _lastStateWriteUtc = DateTime.UtcNow;
+        if (_taskbarState.SetAutoHideEnabled(_baselineAutoHideEnabled))
+        {
+            _managedVisibleActive = false;
+            Config.PendingAutohideRestore = false;
+            _lastStateWriteUtc = DateTime.UtcNow;
+            Save();
+        }
     }
 
     private bool IsWriteCooldownElapsed()

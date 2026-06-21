@@ -4,7 +4,7 @@ using TaskbarUnhideZoner.Services;
 
 namespace TaskbarUnhideZoner.Runtime;
 
-internal sealed class ZoneEngine : IDisposable
+internal sealed class ZoneEngine : IZoneEngineController
 {
     private const long FullscreenCheckIntervalMs = 250;
 

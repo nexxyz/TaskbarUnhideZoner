@@ -3,7 +3,7 @@ using TaskbarUnhideZoner.Interop;
 
 namespace TaskbarUnhideZoner.Services;
 
-internal sealed class TaskbarStateService
+internal sealed class TaskbarStateService : ITaskbarStateService
 {
     public uint GetStateFlags()
     {
