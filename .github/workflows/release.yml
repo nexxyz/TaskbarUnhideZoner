@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate Installer Architecture Flag
         run: |
@@ -28,7 +28,7 @@ jobs:
           }
         shell: powershell
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -46,7 +46,7 @@ jobs:
         shell: powershell
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: installer/TaskbarUnhideZoner-Setup.exe
         env:

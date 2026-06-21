@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate Installer Architecture Flag
         run: |
@@ -26,7 +26,7 @@ jobs:
           }
         shell: powershell
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -34,7 +34,7 @@ jobs:
       - run: dotnet build TaskbarUnhideZoner.slnx --configuration Release --no-restore
       - run: dotnet test TaskbarUnhideZoner.slnx --configuration Release --no-build
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -49,7 +49,7 @@ jobs:
         shell: bash
 
       - name: Upload quality artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quality-report
           path: |
