@@ -57,6 +57,41 @@ public sealed class RuntimeControllerTests
     }
 
     [Fact]
+    public void FailedPendingAutohideRestoreAtStartupRemainsPendingAndRefreshRetries()
+    {
+        var config = new AppConfig
+        {
+            Enabled = true,
+            PendingAutohideRestore = true
+        };
+        var taskbarState = new FakeTaskbarStateService(autoHideEnabled: false);
+        taskbarState.SetAutoHideEnabledResults.Enqueue(false);
+        taskbarState.SetAutoHideEnabledResults.Enqueue(true);
+        var engine = new FakeZoneEngine();
+
+        using var runtime = new RuntimeController(
+            config,
+            taskbarState,
+            _ => engine,
+            _ => { },
+            startupEnabled: false);
+
+        Assert.False(taskbarState.AutoHideEnabled);
+        Assert.True(config.PendingAutohideRestore);
+        Assert.True(runtime.IsAutohideOffSuspended);
+        Assert.Equal(new[] { true }, taskbarState.SetAutoHideEnabledCalls);
+        Assert.Equal(0, engine.StartCalls);
+
+        runtime.RefreshAutohideState();
+
+        Assert.True(taskbarState.AutoHideEnabled);
+        Assert.False(config.PendingAutohideRestore);
+        Assert.False(runtime.IsAutohideOffSuspended);
+        Assert.Equal(new[] { true, true }, taskbarState.SetAutoHideEnabledCalls);
+        Assert.Equal(1, engine.StartCalls);
+    }
+
+    [Fact]
     public void TriggerAndLeaveManageRecoveryFlagLifecycle()
     {
         var config = new AppConfig
@@ -92,6 +127,8 @@ public sealed class RuntimeControllerTests
 
         public List<bool> SetAutoHideEnabledCalls { get; } = new();
 
+        public Queue<bool> SetAutoHideEnabledResults { get; } = new();
+
         public uint GetStateFlags() => AutoHideEnabled ? Interop.NativeMethods.AbsAutoHide : 0;
 
         public bool IsAutoHideEnabled() => AutoHideEnabled;
@@ -99,6 +136,11 @@ public sealed class RuntimeControllerTests
         public bool SetAutoHideEnabled(bool enabled)
         {
             SetAutoHideEnabledCalls.Add(enabled);
+            if (SetAutoHideEnabledResults.Count > 0 && !SetAutoHideEnabledResults.Dequeue())
+            {
+                return false;
+            }
+
             AutoHideEnabled = enabled;
             return true;
         }

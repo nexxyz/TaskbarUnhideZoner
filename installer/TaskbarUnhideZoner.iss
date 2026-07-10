@@ -1,5 +1,5 @@
 #define AppName "Taskbar Unhide Zoner"
-#define AppVersion "1.0.1"
+#define AppVersion "1.0.2"
 #define AppExeName "TaskbarUnhideZoner.exe"
 #define ArchFlag "x64compatible"
 

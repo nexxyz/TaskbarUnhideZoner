@@ -180,6 +180,22 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         {
             var observed = _taskbarState.IsAutoHideEnabled();
 
+            if (Config.PendingAutohideRestore)
+            {
+                if (!observed)
+                {
+                    _taskbarState.SetAutoHideEnabled(true);
+                    observed = _taskbarState.IsAutoHideEnabled();
+                }
+
+                if (observed)
+                {
+                    Config.PendingAutohideRestore = false;
+                    stateChanged = true;
+                    Save();
+                }
+            }
+
             if (_managedVisibleActive)
             {
                 var expected = false;
@@ -284,7 +300,11 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             observed = _taskbarState.IsAutoHideEnabled();
         }
 
-        Config.PendingAutohideRestore = false;
+        if (observed)
+        {
+            Config.PendingAutohideRestore = false;
+        }
+
         return observed;
     }
 
