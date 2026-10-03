@@ -1,6 +1,11 @@
 #define AppName "Taskbar Unhide Zoner"
-#define AppVersion "1.1.0"
 #define AppExeName "TaskbarUnhideZoner.exe"
+; Version comes from <Version> in TaskbarUnhideZoner.csproj via the published exe (run dotnet publish first).
+#define PublishedExe AddBackslash(SourcePath) + "..\src\TaskbarUnhideZoner\bin\Release\net8.0-windows\win-x64\publish\" + AppExeName
+#define AppVersion GetStringFileInfo(PublishedExe, "ProductVersion")
+#if AppVersion == ""
+  #error Could not read ProductVersion from the published exe. Run dotnet publish before compiling the installer.
+#endif
 #define ArchFlag "x64compatible"
 
 [Setup]

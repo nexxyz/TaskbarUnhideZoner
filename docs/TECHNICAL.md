@@ -48,7 +48,7 @@ Installer output:
 
 Use `RELEASE_CHECKLIST.md` for the full step-by-step release process and manual verification matrix.
 
-1. Update installer version in `installer/TaskbarUnhideZoner.iss`.
+1. Update `<Version>` in `src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj` (single source; the installer reads it from the published exe).
 2. Commit and push to `main`.
 3. Create and push tag (for example `vX.Y.Z`):
 

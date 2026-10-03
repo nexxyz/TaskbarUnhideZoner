@@ -17,7 +17,7 @@
   - Verify fullscreen suspension and autohide-off suspension behavior
 
 - Packaging
-  - Bump version in `installer/TaskbarUnhideZoner.iss`
+  - Bump `<Version>` in `src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj` (the installer reads it from the published exe)
   - `dotnet publish src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -c Release -r win-x64 --self-contained false`
   - Build installer: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\TaskbarUnhideZoner.iss`
 
