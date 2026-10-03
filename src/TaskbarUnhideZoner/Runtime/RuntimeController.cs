@@ -1,4 +1,5 @@
 using TaskbarUnhideZoner.Config;
+using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Models;
 using TaskbarUnhideZoner.Services;
 using TaskbarUnhideZoner.Startup;
@@ -7,22 +8,31 @@ namespace TaskbarUnhideZoner.Runtime;
 
 internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 {
+    // Must stay well below Explorer's ~500 ms auto-hide timer so the taskbar stays shown while in zone.
+    private const int DefaultRevealKeepAliveMs = 200;
+
     private readonly object _sync = new();
     private readonly IZoneEngineController _engine;
     private readonly ITaskbarStateService _taskbarState;
+    private readonly ITaskbarRevealService _reveal;
     private readonly Action<AppConfig> _saveConfig;
     private readonly System.Threading.Timer _autohidePollTimer;
+    private readonly System.Threading.Timer _revealKeepAliveTimer;
     private readonly int _autohidePollMs;
+    private readonly int _revealKeepAliveMs;
 
-    private bool _baselineAutoHideEnabled;
-    private bool _managedVisibleActive;
-    private DateTime _lastStateWriteUtc;
+    private bool _autoHideEnabled;
+    private bool _revealActive;
+    private bool _revealVerified;
+    private int _revealGeneration;
+    private bool _disposed;
     private string? _monitoringError;
 
     public RuntimeController(AppConfig config)
         : this(
             config,
             new TaskbarStateService(),
+            new TaskbarMessageRevealService(),
             handler => new ZoneEngine(config, handler),
             persistedConfig => ConfigStore.Save(Paths.ConfigFilePath, persistedConfig),
             StartupManager.IsEnabled())
@@ -32,18 +42,23 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     internal RuntimeController(
         AppConfig config,
         ITaskbarStateService taskbarState,
+        ITaskbarRevealService reveal,
         Func<IZoneActivationHandler, IZoneEngineController> engineFactory,
         Action<AppConfig> saveConfig,
-        bool startupEnabled)
+        bool startupEnabled,
+        int revealKeepAliveMs = DefaultRevealKeepAliveMs)
     {
         Config = config;
         _taskbarState = taskbarState;
+        _reveal = reveal;
         _engine = engineFactory(this);
         _saveConfig = saveConfig;
+        _revealKeepAliveMs = revealKeepAliveMs;
         Config.StartWithWindows = startupEnabled;
         _autohidePollMs = Math.Clamp(Config.AutohideStatePollSeconds, 5, 300) * 1000;
 
-        _baselineAutoHideEnabled = InitializeAutohideState();
+        _revealKeepAliveTimer = new System.Threading.Timer(_ => KeepRevealAlive(), null, Timeout.Infinite, Timeout.Infinite);
+        _autoHideEnabled = InitializeAutohideState();
         ApplyRuntimeGateLocked();
         Save();
 
@@ -60,7 +75,7 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         {
             lock (_sync)
             {
-                return Config.Enabled && !_baselineAutoHideEnabled && !_managedVisibleActive;
+                return Config.Enabled && !_autoHideEnabled;
             }
         }
     }
@@ -81,11 +96,6 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         lock (_sync)
         {
             Config.Enabled = enabled;
-            if (!enabled)
-            {
-                RestoreBaselineLocked();
-            }
-
             ApplyRuntimeGateLocked();
             Save();
         }
@@ -163,7 +173,14 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         lock (_sync)
         {
-            if (Config.Enabled && (_baselineAutoHideEnabled || _managedVisibleActive))
+            if (_disposed)
+            {
+                return;
+            }
+
+            // The engine forgets an active trigger on reinitialize without reporting a zone leave.
+            StopRevealLocked();
+            if (Config.Enabled && _autoHideEnabled)
             {
                 _engine.Reinitialize();
             }
@@ -178,13 +195,19 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
 
         lock (_sync)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             var observed = _taskbarState.IsAutoHideEnabled();
 
+            // Recovery for app versions before 1.1, which turned auto-hide off while revealing.
             if (Config.PendingAutohideRestore)
             {
                 if (!observed)
                 {
-                    _taskbarState.SetAutoHideEnabled(true);
+                    _taskbarState.EnableAutoHide();
                     observed = _taskbarState.IsAutoHideEnabled();
                 }
 
@@ -196,19 +219,9 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
                 }
             }
 
-            if (_managedVisibleActive)
+            if (_autoHideEnabled != observed)
             {
-                var expected = false;
-                if (observed != expected && IsWriteCooldownElapsed())
-                {
-                    _managedVisibleActive = false;
-                    _baselineAutoHideEnabled = observed;
-                    stateChanged = true;
-                }
-            }
-            else if (_baselineAutoHideEnabled != observed)
-            {
-                _baselineAutoHideEnabled = observed;
+                _autoHideEnabled = observed;
                 stateChanged = true;
             }
 
@@ -225,32 +238,32 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         lock (_sync)
         {
-            if (!Config.Enabled || !_baselineAutoHideEnabled || _managedVisibleActive)
+            if (_disposed || !Config.Enabled || !_autoHideEnabled || _revealActive)
             {
                 return;
             }
 
-            if (_taskbarState.SetAutoHideEnabled(false))
-            {
-                _managedVisibleActive = true;
-                Config.PendingAutohideRestore = true;
-                _lastStateWriteUtc = DateTime.UtcNow;
-                Save();
-            }
+            _revealActive = true;
+            _revealVerified = false;
+            _revealGeneration++;
+            _revealKeepAliveTimer.Change(_revealKeepAliveMs, Timeout.Infinite);
         }
 
-        RaiseStateChanged();
+        // Cross-process sends stay outside the lock so a slow Explorer cannot stall the tray UI.
+        _reveal.Reveal();
     }
 
     public void OnZoneLeft()
     {
         lock (_sync)
         {
-            RestoreBaselineLocked();
-            ApplyRuntimeGateLocked();
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        RaiseStateChanged();
+            StopRevealLocked();
+        }
     }
 
     public void Save()
@@ -262,15 +275,22 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         lock (_sync)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
             _autohidePollTimer.Dispose();
-            RestoreBaselineLocked();
+            StopRevealLocked();
+            _revealKeepAliveTimer.Dispose();
             _engine.Dispose();
         }
     }
 
     private void ApplyRuntimeGateLocked()
     {
-        var shouldRun = Config.Enabled && (_baselineAutoHideEnabled || _managedVisibleActive);
+        var shouldRun = Config.Enabled && _autoHideEnabled;
         if (shouldRun)
         {
             try
@@ -281,11 +301,13 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
             catch (Exception ex)
             {
                 _monitoringError = ex.Message;
+                StopRevealLocked();
                 _engine.Stop();
             }
         }
         else
         {
+            StopRevealLocked();
             _engine.Stop();
         }
     }
@@ -294,9 +316,10 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
     {
         var observed = _taskbarState.IsAutoHideEnabled();
 
+        // Recovery for app versions before 1.1, which turned auto-hide off while revealing.
         if (Config.PendingAutohideRestore && !observed)
         {
-            _taskbarState.SetAutoHideEnabled(true);
+            _taskbarState.EnableAutoHide();
             observed = _taskbarState.IsAutoHideEnabled();
         }
 
@@ -308,25 +331,59 @@ internal sealed class RuntimeController : IDisposable, IZoneActivationHandler
         return observed;
     }
 
-    private void RestoreBaselineLocked()
+    // One-shot timer re-armed after each send, so slow sends cannot overlap or pile up.
+    private void KeepRevealAlive()
     {
-        if (!_managedVisibleActive)
+        int generation;
+        bool verify;
+        lock (_sync)
+        {
+            if (_disposed || !_revealActive)
+            {
+                return;
+            }
+
+            generation = _revealGeneration;
+            verify = !_revealVerified;
+        }
+
+        var verified = false;
+        try
+        {
+            if (_reveal.Reveal() && verify)
+            {
+                verified = true;
+                if (!_reveal.IsAnyTaskbarShown())
+                {
+                    RollingFileLogger.Error("REVEAL_INEFFECTIVE taskbar not shown after reveal message");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            RollingFileLogger.Error($"REVEAL_KEEPALIVE_FAIL {ex.Message}");
+        }
+
+        lock (_sync)
+        {
+            if (!_disposed && _revealActive && generation == _revealGeneration)
+            {
+                _revealVerified |= verified;
+                _revealKeepAliveTimer.Change(_revealKeepAliveMs, Timeout.Infinite);
+            }
+        }
+    }
+
+    private void StopRevealLocked()
+    {
+        if (!_revealActive)
         {
             return;
         }
 
-        if (_taskbarState.SetAutoHideEnabled(_baselineAutoHideEnabled))
-        {
-            _managedVisibleActive = false;
-            Config.PendingAutohideRestore = false;
-            _lastStateWriteUtc = DateTime.UtcNow;
-            Save();
-        }
-    }
-
-    private bool IsWriteCooldownElapsed()
-    {
-        return (DateTime.UtcNow - _lastStateWriteUtc).TotalMilliseconds >= 1500;
+        // Explorer hides the taskbar on its own once keep-alive stops, unless the cursor is over it.
+        _revealActive = false;
+        _revealKeepAliveTimer.Change(Timeout.Infinite, Timeout.Infinite);
     }
 
     private void RaiseStateChanged()

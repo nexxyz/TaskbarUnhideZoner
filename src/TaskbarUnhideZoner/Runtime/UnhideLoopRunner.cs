@@ -1,3 +1,4 @@
+using TaskbarUnhideZoner.Interop;
 using TaskbarUnhideZoner.Logging;
 using TaskbarUnhideZoner.Services;
 
@@ -12,12 +13,13 @@ internal static class UnhideLoopRunner
         var revealHoldMs = ParseInt(args, "--reveal-hold-ms", 1500, 250, 10000);
         var attempts = Math.Max(1, (durationSec * 1000) / intervalMs);
         var taskbarState = new TaskbarStateService();
+        var reveal = new TaskbarMessageRevealService();
 
-        RollingFileLogger.Info($"UNHIDE_LOOP_START intervalMs={intervalMs} durationSec={durationSec} attempts={attempts} mode=abm-setstate revealHoldMs={revealHoldMs}");
+        RollingFileLogger.Info($"UNHIDE_LOOP_START intervalMs={intervalMs} durationSec={durationSec} attempts={attempts} revealHoldMs={revealHoldMs}");
 
         for (var i = 1; i <= attempts; i++)
         {
-            var ok = TryUnhideOnce(taskbarState, revealHoldMs, out var details);
+            var ok = TryRevealOnce(taskbarState, reveal, revealHoldMs, out var details);
             var status = ok ? "PASS" : "FAIL";
             var line = $"[{DateTime.Now:HH:mm:ss}] Unhide attempt {i}/{attempts}: {status} ({details})";
             RollingFileLogger.Info(line);
@@ -33,25 +35,56 @@ internal static class UnhideLoopRunner
         return 0;
     }
 
-    private static bool TryUnhideOnce(TaskbarStateService taskbarState, int revealHoldMs, out string details)
+    private static bool TryRevealOnce(TaskbarStateService taskbarState, TaskbarMessageRevealService reveal, int revealHoldMs, out string details)
     {
-        var before = taskbarState.GetStateFlags();
-        var hadAutoHide = (before & Interop.NativeMethods.AbsAutoHide) != 0;
-
-        if (!hadAutoHide)
+        if (!taskbarState.IsAutoHideEnabled())
         {
-            details = "autohide already off; skipped";
+            details = "autohide off; skipped";
             return true;
         }
 
-        var showOk = taskbarState.SetAutoHideEnabled(false);
-        Thread.Sleep(revealHoldMs);
-        var restoreOk = taskbarState.SetAutoHideEnabled(true);
-        var after = taskbarState.GetStateFlags();
-        var finalAutoHide = (after & Interop.NativeMethods.AbsAutoHide) != 0;
+        var workAreasBefore = GetWorkAreas();
+        var shownSamples = 0;
+        var samples = 0;
+        for (var elapsed = 0; elapsed < revealHoldMs; elapsed += 200)
+        {
+            reveal.Reveal();
+            Thread.Sleep(200);
 
-        details = $"showOk={showOk}, restoreOk={restoreOk}, finalAutoHide={finalAutoHide}";
-        return showOk && restoreOk && finalAutoHide;
+            // The first sample may still be inside Explorer's slide-in animation.
+            if (elapsed == 0)
+            {
+                continue;
+            }
+
+            samples++;
+            if (AllTaskbarsShown())
+            {
+                shownSamples++;
+            }
+        }
+
+        var workAreasUnchanged = workAreasBefore.SequenceEqual(GetWorkAreas());
+        var autoHideKept = taskbarState.IsAutoHideEnabled();
+        details = $"allTaskbarsShown={shownSamples}/{samples}, workAreasUnchanged={workAreasUnchanged}, autoHideKept={autoHideKept}";
+        return shownSamples == samples && workAreasUnchanged && autoHideKept;
+    }
+
+    private static bool AllTaskbarsShown()
+    {
+        var taskbars = new List<IntPtr> { NativeMethods.FindWindow("Shell_TrayWnd", null) };
+        var secondary = IntPtr.Zero;
+        while ((secondary = NativeMethods.FindWindowEx(IntPtr.Zero, secondary, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
+        {
+            taskbars.Add(secondary);
+        }
+
+        return taskbars.All(taskbar => taskbar != IntPtr.Zero && TaskbarMessageRevealService.IsTaskbarShown(taskbar));
+    }
+
+    private static List<Rectangle> GetWorkAreas()
+    {
+        return Screen.AllScreens.Select(screen => screen.WorkingArea).ToList();
     }
 
     private static int ParseInt(string[] args, string key, int fallback, int min, int max)

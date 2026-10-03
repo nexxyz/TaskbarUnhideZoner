@@ -2,11 +2,8 @@ namespace TaskbarUnhideZoner.Services;
 
 internal interface ITaskbarStateService
 {
-    uint GetStateFlags();
-
     bool IsAutoHideEnabled();
 
-    bool SetAutoHideEnabled(bool enabled);
-
-    bool SetStateFlags(uint stateFlags);
+    // Only used to recover from app versions before 1.1, which turned auto-hide off while revealing.
+    bool EnableAutoHide();
 }

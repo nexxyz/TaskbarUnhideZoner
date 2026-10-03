@@ -12,6 +12,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - At runtime, both edge and hot-zone are detected as a single persisted rectangle (same detection path, different capture UX).
 - Supports quick toggles from tray menu (enable/disable, startup, delay preset, trigger assist, zone selection).
 - Uses no cursor hijacking in normal app behavior (no pointer nudging).
+- Reveals the taskbar without turning auto-hide off, so windows that reach into the taskbar area do not hop up and focus stays where it is.
 
 ## Requirements
 
@@ -55,7 +56,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 - If Windows taskbar auto-hide is off, the app suspends monitoring.
 - In that state, the enable item is grayed out and shows a message indicating auto-hide is off.
 - Re-enable auto-hide in Windows settings, then reopen tray menu or wait for periodic refresh.
-- If a previous app run crashed after temporarily turning auto-hide off, the next startup attempts a one-time restore.
+- The app never changes the auto-hide setting while running. Versions before 1.1 turned auto-hide off temporarily to reveal the taskbar; if such a run crashed in that state, the next startup restores auto-hide once.
 
 ### Already running behavior
 
@@ -65,7 +66,7 @@ Taskbar Unhide Zoner is a lightweight Windows tray utility that helps you keep t
 
 Config path:
 
-- `%LocalAppData%\TaskbarUnhideZoner\config.json`
+- `%AppData%\TaskbarUnhideZoner\config.json`
 
 You can edit this file directly while the app is not running. Main fields:
 
@@ -93,12 +94,14 @@ You can edit this file directly while the app is not running. Main fields:
 - Trigger feels too eager or too strict:
   - Try a different `Trigger Assist` preset.
   - `Low` keeps the hot area narrow near edge/center; `Strong` ramps faster across the zone.
+- Taskbar no longer reveals after a Windows update:
+  - The reveal relies on undocumented Explorer behavior. Check the log for `REVEAL_INEFFECTIVE` and report an issue.
 - App seems inactive in fullscreen apps:
   - This is expected when fullscreen suspension is enabled.
 
 Logs:
 
-- `%LocalAppData%\TaskbarUnhideZoner\taskbar-unhide-zoner.log`
+- `%AppData%\TaskbarUnhideZoner\taskbar-unhide-zoner.log`
 
 ## Technical notes
 

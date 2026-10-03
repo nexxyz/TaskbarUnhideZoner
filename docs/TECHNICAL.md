@@ -20,7 +20,7 @@ Harness (basic runtime crash/regression sequence):
 dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --harness
 ```
 
-No-move unhide probe:
+No-move unhide probe (checks that every taskbar is shown while the work areas and auto-hide state stay unchanged):
 
 ```powershell
 dotnet run --project src/TaskbarUnhideZoner/TaskbarUnhideZoner.csproj -- --test-unhide-loop --interval-ms 5000 --duration-sec 60

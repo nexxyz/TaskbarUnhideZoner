@@ -5,38 +5,27 @@ namespace TaskbarUnhideZoner.Services;
 
 internal sealed class TaskbarStateService : ITaskbarStateService
 {
-    public uint GetStateFlags()
-    {
-        var data = CreateAppBarData();
-        var result = NativeMethods.SHAppBarMessage(NativeMethods.AbmGetState, ref data);
-        return unchecked((uint)result.ToInt64());
-    }
-
     public bool IsAutoHideEnabled() => (GetStateFlags() & NativeMethods.AbsAutoHide) != 0;
 
-    public bool SetAutoHideEnabled(bool enabled)
+    public bool EnableAutoHide()
     {
         var current = GetStateFlags();
-        var desired = enabled
-            ? (current | NativeMethods.AbsAutoHide)
-            : (current & ~NativeMethods.AbsAutoHide);
-
-        if (desired == current)
+        if ((current & NativeMethods.AbsAutoHide) != 0)
         {
             return true;
         }
 
-        return SetStateFlags(desired);
+        var data = CreateAppBarData();
+        data.LParam = new IntPtr((int)(current | NativeMethods.AbsAutoHide));
+        NativeMethods.SHAppBarMessage(NativeMethods.AbmSetState, ref data);
+        return IsAutoHideEnabled();
     }
 
-    public bool SetStateFlags(uint stateFlags)
+    private static uint GetStateFlags()
     {
         var data = CreateAppBarData();
-        data.LParam = new IntPtr((int)stateFlags);
-
-        NativeMethods.SHAppBarMessage(NativeMethods.AbmSetState, ref data);
-        var readBack = GetStateFlags();
-        return (readBack & NativeMethods.AbsAutoHide) == (stateFlags & NativeMethods.AbsAutoHide);
+        var result = NativeMethods.SHAppBarMessage(NativeMethods.AbmGetState, ref data);
+        return unchecked((uint)result.ToInt64());
     }
 
     private static NativeMethods.AppBarData CreateAppBarData()

@@ -6,6 +6,9 @@ namespace TaskbarUnhideZoner.Interop;
 internal static class NativeMethods
 {
     public const int WhMouseLl = 14;
+    public const uint WmActivate = 0x0006;
+    public const int WaInactive = 0;
+    public const int WaActive = 1;
     public const int WmMouseMove = 0x0200;
     public const int WmNcMouseMove = 0x00A0;
     public const int HtClient = 1;
@@ -109,6 +112,9 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);

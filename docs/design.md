@@ -74,16 +74,29 @@ Shared logic:
 Taskbar reveal strategy:
 
 1. Strict no-move policy: cursor movement/synthetic pointer nudging is not allowed.
-2. Use `SHAppBarMessage` state control (`ABM_GETSTATE` / `ABM_SETSTATE`) for zone-driven show/restore.
-3. On zone enter (after dwell), disable autohide (show taskbar); on zone leave, restore baseline state.
+2. Send `WM_ACTIVATE(WA_ACTIVE)` followed by `WM_ACTIVATE(WA_INACTIVE)` to every taskbar window (`Shell_TrayWnd`, `Shell_SecondaryTrayWnd`).
+   - Explorer's taskbar window procedure calls its internal unhide routine on `WA_ACTIVE` without checking real activation; `WA_INACTIVE` restarts Explorer's own ~500 ms auto-hide timer.
+   - The pair is re-sent every 200 ms while the zone stays triggered; on zone leave the keep-alive stops and Explorer hides the taskbar itself (unless the cursor is over it).
+   - The keep-alive skips sending while the cursor is over a taskbar or the taskbar thread owns the foreground window, because Explorer then keeps the bar shown itself and a fake deactivation could disturb taskbar focus, flyouts, or z-order.
+   - Secondary taskbars receive the pair before the primary taskbar. Multi-monitor behavior is implemented but not yet verified on hardware.
+   - If the first keep-alive tick finds no taskbar shown, `REVEAL_INEFFECTIVE` is logged.
+   - Auto-hide state, desktop work area, window positions, and foreground focus are never changed, so windows reaching into the taskbar area do not hop.
+3. Versions before 1.1 revealed the taskbar by disabling autohide (`ABM_SETSTATE`) while in zone. That shrinks the work area, which makes Windows move maximized and overlapping windows, so it was removed.
+
+Evaluated and rejected reveal approaches (Windows 11 26200):
+
+- Pinning the work area with `SPI_SETWORKAREA` after `ABM_SETSTATE`: windows have already moved and Explorer resets the work area.
+- `SetForegroundWindow(Shell_TrayWnd)`: steals focus and does not reliably reveal.
+- Synthetic `Win+T`: reveals reliably but moves keyboard focus to the taskbar.
+- `FlashWindowEx` on the taskbar, `SetWindowPos` on the taskbar (Explorer rejects the move), fake `WM_MOUSEMOVE`, and `WM_USER+18..24`: no reveal.
 
 ## No-move and autohide state decisions
 
 - No cursor movement is allowed for taskbar reveal. Any cursor-nudge/synthetic mouse movement approach is out of scope.
-- Primary reveal mechanism is taskbar state management via `SHAppBarMessage` (`ABM_GETSTATE` / `ABM_SETSTATE`).
+- The reveal mechanism is the `WM_ACTIVATE` message (see taskbar reveal strategy). The app never writes the autohide state at runtime; `ABM_GETSTATE` is only read.
 - Zone behavior:
-  - On dwell-complete zone enter: disable autohide (taskbar shown).
-  - On zone leave: restore prior autohide state.
+  - On dwell-complete zone enter: reveal the taskbar and start the keep-alive.
+  - On zone leave: stop the keep-alive; Explorer hides the taskbar itself.
 - If taskbar autohide is already off:
   - Suspend zone monitoring entirely (monitor pipeline is not running).
   - Do not run trigger logic.
@@ -95,15 +108,12 @@ Taskbar reveal strategy:
   - Read with `ABM_GETSTATE` on startup.
   - Re-check when tray menu opens.
   - Background polling interval is low-frequency: every 5 seconds (max cadence).
-- Conflict avoidance with our own toggles:
-  - Track app-initiated state changes separately from external/manual changes.
-  - If external/manual change is detected, adopt it as the new baseline and avoid thrashing.
+- External/manual autohide changes are adopted on the next poll (monitoring suspends or resumes accordingly).
 - Monitoring backend policy:
   - Do not silently fallback to another backend at runtime.
   - If mouse hook initialization fails, surface a clear disabled/unavailable status in the tray UI.
 - Safety:
-  - On exit, restore state only if this app changed it.
-  - Do not leave taskbar state unintentionally altered after normal shutdown.
+  - Startup recovery: if `PendingAutohideRestore` was left set by a pre-1.1 run that crashed with autohide off, re-enable autohide once (retried on the poll until it succeeds).
 
 ## Lifecycle hardening
 
@@ -239,7 +249,7 @@ Harness execution contract:
   - `IZoneMonitor` abstraction (mouse-hook implementation)
   - zone evaluator and dwell engine
 - `Trigger`
-  - no-move taskbar state strategy and restore logic
+  - message-based taskbar reveal and keep-alive
 - `UI`
   - temporary hot-zone selection overlay
 - `Interop`
@@ -257,7 +267,7 @@ Harness execution contract:
 1. Scaffold app shell (single instance, tray icon, context menu, config persistence, startup toggle).
 2. Implement zone model, dwell logic, and mouse-hook backend.
 3. Keep mouse-hook monitor as the single runtime backend.
-4. Implement strict no-move taskbar state strategy (`ABM_GETSTATE` / `ABM_SETSTATE`).
+4. Implement strict no-move taskbar reveal (`WM_ACTIVATE` message keep-alive).
 5. Implement hot-zone draw overlay (`Esc` cancel).
 6. Add unit tests for logic modules.
 7. Add local live-test harness and logging checks.
