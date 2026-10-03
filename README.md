@@ -107,3 +107,7 @@ Logs:
 
 - Build/release and developer workflows are documented in `docs/TECHNICAL.md`.
 - Release execution checklist is in `RELEASE_CHECKLIST.md`.
+
+## Disclaimer
+
+This project was developed with AI assistance.
